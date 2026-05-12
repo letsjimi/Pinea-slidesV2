@@ -24,6 +24,10 @@ async function refreshTimelineData() {
     const saved = await db.layouts.get(currentTV);
     if(saved) {
       layoutData=saved;
+      const rotEl=document.getElementById('tvRotation');
+      const animEl=document.getElementById('rowAnimationMode');
+      if(rotEl) rotEl.value=layoutData.rotation||'0';
+      if(animEl) animEl.value=layoutData.rowAnimationMode||'cell';
       console.log('[Timeline] Layout geladen für', currentTV, ':', layoutData);
     } else {
       layoutData={tvId:currentTV,rows:3,cols:2,timelines:[[],[],[]],step:1,cellGap:4,useMatrix:true};
@@ -163,9 +167,11 @@ window.updateMatrixFromSettings=async function(){
   const step=parseInt(document.getElementById('matrixStep')?.value)||1;
   const gap=parseInt(document.getElementById('cellGap')?.value)||4;
   const stagger=parseInt(document.getElementById('rowStagger')?.value)||0;
+  const rotation=parseInt(document.getElementById('tvRotation')?.value)||0;
+  const rowAnim=document.getElementById('rowAnimationMode')?.value||'cell';
   const oldR=layoutData.rows||3, oldT=layoutData.timelines||[];
   const newT=Array.from({length:r},(_,ri)=> ri<oldR && oldT[ri]?[...oldT[ri]]:[] );
   const offsets=Array.from({length:r},(_,i)=>i*stagger);
-  layoutData={...layoutData,rows:r,cols:c,step,cellGap:gap,timelines:newT,rowOffsets:offsets};
+  layoutData={...layoutData,rows:r,cols:c,step,cellGap:gap,timelines:newT,rowOffsets:offsets,rotation,rowAnimationMode:rowAnim};
   await db.layouts.put(layoutData); renderAllRows(); toast('Layout aktualisiert','success');
 };

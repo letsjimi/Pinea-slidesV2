@@ -225,7 +225,7 @@ async function loadConfig() {
   const set = (id, val) => { const el=document.getElementById(id); if(el){ if(el.type==='checkbox') el.checked=!!val; else el.value=val||''; } };
   set('cfgGridVisible', cfg.gridVisible);
   set('cfgGridColor', cfg.gridColor);
-  set('cfgGridOpacity', cfg.gridOpacity);
+  set('cfgGridOpacity', Math.round((cfg.gridOpacity || 0.4) * 100));
   set('cfgGridWidth', cfg.gridWidthPx);
   set('cfgGridCols', cfg.gridCols || 2);
   set('cfgGridRows', cfg.gridRows || 2);
@@ -244,8 +244,8 @@ async function saveConfig() {
   const cfg = {
     id:'global',
     gridVisible: get('cfgGridVisible'),
-    gridColor: get('cfgGridColor'),
-    gridOpacity: parseFloat(get('cfgGridOpacity')),
+    gridColor: (function(v){ return /^#[0-9A-Fa-f]{6}$/.test(v||'') ? v : '#ff3366'; })(get('cfgGridColor')),
+    gridOpacity: parseInt(get('cfgGridOpacity') || 40) / 100,
     gridWidthPx: parseInt(get('cfgGridWidth')),
     gridCols: parseInt(get('cfgGridCols')),
     gridRows: parseInt(get('cfgGridRows')),
@@ -300,6 +300,11 @@ async function saveTransitionConfig() {
   toast('Übergang gespeichert','success');
 }
 window.saveTransitionConfig = saveTransitionConfig;
+
+window.refreshPreview = function(side) {
+    const iframe = document.getElementById(side === 'left' ? 'previewLeft' : 'previewRight');
+    if(iframe) iframe.src = iframe.src;
+};
 
 function testTransition() {
   const testUrl = serverURL + '/tv-left.html';

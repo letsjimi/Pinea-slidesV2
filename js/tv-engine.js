@@ -21,6 +21,26 @@ function applyConfig() {
   document.documentElement.style.setProperty('--grid-color', config.gridColor||'#ff3366');
   document.documentElement.style.setProperty('--grid-opacity', config.gridOpacity||0.4);
   document.documentElement.style.setProperty('--grid-width', (config.gridWidthPx||1)+'px');
+  // TV-Rotation
+  const container=document.getElementById('tvContainer');
+  if(container && layout.rotation){
+    const rot=layout.rotation;
+    container.style.transform=`rotate(${rot}deg)`;
+    if(rot===90 || rot===-90){
+      container.style.width='100vh'; container.style.height='100vw';
+      container.style.left='50%'; container.style.top='50%';
+      container.style.transform=`rotate(${rot}deg) translate(-50%,-50%)`;
+      container.style.transformOrigin='center center';
+      document.body.classList.add('tv-rotated');
+    }else{
+      container.style.width=''; container.style.height='';
+      container.style.left=''; container.style.top='';
+      container.style.transformOrigin='';
+      document.body.classList.remove('tv-rotated');
+    }
+  } else if(container) {
+    document.body.classList.remove('tv-rotated');
+  }
   const gc=config.gridCols||2, gr=config.gridRows||2;
   document.documentElement.style.setProperty('--grid-size', (100/gc)+'% '+(100/gr)+'%');
   document.documentElement.style.setProperty('--crop-mode', config.cropMode||'cover');
@@ -60,35 +80,73 @@ function showScreensaver(show){
 function renderMatrix() {
   const rows=layout.rows||3, cols=layout.cols||2;
   const timelines=layout.timelines||[], step=layout.step||1, gap=layout.cellGap||0;
+  const isStrip=layout.rowAnimationMode==='strip';
   const container=document.getElementById('tvContainer');
   if(!container) return console.error('[TV] tvContainer nicht gefunden');
 
   const matrix=document.createElement('div');
   matrix.className='tv-matrix';
-  matrix.style.cssText=`display:grid;grid-template-rows:repeat(${rows},1fr);grid-template-columns:repeat(${cols},1fr);gap:${gap}px;position:absolute;inset:0;z-index:1;`;
+  if(isStrip){
+    matrix.style.cssText=`display:flex;flex-direction:column;gap:${gap}px;position:absolute;inset:0;z-index:1;overflow:hidden;`;
+  }else{
+    matrix.style.cssText=`display:grid;grid-template-rows:repeat(${rows},1fr);grid-template-columns:repeat(${cols},1fr);gap:${gap}px;position:absolute;inset:0;z-index:1;`;
+  }
 
   for(let r=0;r<rows;r++){
     const ids=timelines[r]||[];
     const hasImages=ids.length>0;
-    for(let c=0;c<cols;c++){
-      const cell=document.createElement('div');
-      cell.className='tv-cell';
-      cell.style.cssText='position:relative;background:#000;overflow:hidden;';
-      const img=document.createElement('img');
-      img.alt=''; img.loading='eager';
-      img.style.cssText='width:100%;height:100%;object-fit:var(--crop-mode,cover);display:block;transition:opacity 0.5s ease;opacity:0;';
+    if(isStrip){
+      // Strip-Modus: eine lange Reihe pro Zeile, CSS-Animation scrollt
+      const strip=document.createElement('div');
+      strip.className='tv-strip';
+      strip.style.cssText=`display:flex;gap:${gap}px;height:${100/rows}%;width:100%;position:relative;overflow:hidden;`;
       if(hasImages){
-        const slideId=ids[c%ids.length];
-        loadSlideImage(slideId).then(url=>{
-          if(url){ img.src=url; img.onload=()=>img.style.opacity='1'; }
-        }).catch(()=>{});
+        // Erzeuge 2× Kopien für endlosen Scroll
+        const imgs=[];
+        for(let k=0;k<2;k++){
+          for(let i=0;i<ids.length;i++){
+            const slideId=ids[i];
+            const w=document.createElement('div');
+            w.style.cssText='flex-shrink:0;height:100%;aspect-ratio:9/16;background:#000;overflow:hidden;';
+            const img=document.createElement('img');
+            img.alt=''; img.loading='eager';
+            img.style.cssText='width:100%;height:100%;object-fit:var(--crop-mode,cover);display:block;';
+            loadSlideImage(slideId).then(url=>{ if(url) img.src=url; }).catch(()=>{});
+            w.appendChild(img); strip.appendChild(w);
+          }
+        }
+        // CSS-Keyframe-Animation
+        const animId='stripScrollR'+r;
+        const dur=(config.slideshowSpeed||5000)*(ids.length/cols)/1000;
+        strip.style.animation=`${animId} ${dur}s linear infinite`;
+        const style=document.createElement('style');
+        style.textContent=`@keyframes ${animId}{from{transform:translateX(0)}to{transform:translateX(-50%)}}`;
+        document.head.appendChild(style);
+      }else{
+        strip.innerHTML='<div style="flex:1;background:#000;"></div>';
       }
-      cell.appendChild(img); matrix.appendChild(cell);
-    }
-    // ANIMATION: starte wenn mindestens 1 Bild vorhanden
-    if(hasImages){
-      const offset=layout.rowOffsets?.[r] || r*2000;
-      startRowStrip(r, ids, cols, step, offset);
+      matrix.appendChild(strip);
+    }else{
+      // Cell-Modus (bestehendes Grid-Layout)
+      for(let c=0;c<cols;c++){
+        const cell=document.createElement('div');
+        cell.className='tv-cell';
+        cell.style.cssText='position:relative;background:#000;overflow:hidden;';
+        const img=document.createElement('img');
+        img.alt=''; img.loading='eager';
+        img.style.cssText='width:100%;height:100%;object-fit:var(--crop-mode,cover);display:block;transition:opacity 0.5s ease;opacity:0;';
+        if(hasImages){
+          const slideId=ids[c%ids.length];
+          loadSlideImage(slideId).then(url=>{
+            if(url){ img.src=url; img.onload=()=>img.style.opacity='1'; }
+          }).catch(()=>{});
+        }
+        cell.appendChild(img); matrix.appendChild(cell);
+      }
+      if(hasImages){
+        const offset=layout.rowOffsets?.[r] || r*2000;
+        startRowStrip(r, ids, cols, step, offset);
+      }
     }
   }
   container.appendChild(matrix);
