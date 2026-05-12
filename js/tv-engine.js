@@ -86,64 +86,100 @@ function renderMatrix() {
 
   const matrix=document.createElement('div');
   matrix.className='tv-matrix';
-  matrix.style.cssText=`display:grid;grid-template-rows:repeat(${rows},1fr);grid-template-columns:repeat(${cols},1fr);gap:${gap}px;position:absolute;inset:0;z-index:1;`;
+
+  if(isStrip){
+    matrix.style.cssText=`display:flex;flex-direction:column;gap:${gap}px;position:absolute;inset:0;z-index:1;`;
+  }else{
+    matrix.style.cssText=`display:grid;grid-template-rows:repeat(${rows},1fr);grid-template-columns:repeat(${cols},1fr);gap:${gap}px;position:absolute;inset:0;z-index:1;`;
+  }
 
   for(let r=0;r<rows;r++){
     const ids=timelines[r]||[];
     const hasImages=ids.length>0;
-    // Zeilen-Wrapper für gemeinsame Animation im Strip-Modus
-    const rowWrapper=document.createElement('div');
-    rowWrapper.className='tv-row';
-    rowWrapper.style.cssText=`display:contents;`;
 
-    for(let c=0;c<cols;c++){
-      const cell=document.createElement('div');
-      cell.className='tv-cell';
-      cell.dataset.row=r; cell.dataset.col=c;
-      cell.style.cssText='position:relative;background:#000;overflow:hidden;';
-      const img=document.createElement('img');
-      img.alt=''; img.loading='eager';
-      img.style.cssText='width:100%;height:100%;object-fit:var(--crop-mode,cover);display:block;transition:opacity 0.5s ease;opacity:0;';
-      if(hasImages){
-        const slideId=ids[c%ids.length];
+    if(isStrip){
+      // Strip-Modus: jede Zeile ist ein overflow:hidden Container mit horizontalem Streifen
+      const rowWrapper=document.createElement('div');
+      rowWrapper.className='tv-row';
+      rowWrapper.style.cssText=`flex:1;overflow:hidden;position:relative;background:#000;`;
+
+      const strip=document.createElement('div');
+      strip.className='tv-strip';
+      strip.dataset.row=r;
+      strip.style.cssText=`display:flex;height:100%;`;
+      // Dupliziere Timeline 3x für nahtlosen Ringpuffer-Loop
+      const displayIds=[...ids,...ids,...ids];
+
+      for(let i=0;i<displayIds.length;i++){
+        const slideId=displayIds[i];
+        const cell=document.createElement('div');
+        cell.className='tv-strip-cell';
+        cell.style.cssText=`width:calc(100%/${cols});height:100%;flex-shrink:0;position:relative;overflow:hidden;`;
+        const img=document.createElement('img');
+        img.alt=''; img.loading='eager';
+        img.style.cssText='width:100%;height:100%;object-fit:var(--crop-mode,cover);display:block;';
         loadSlideImage(slideId).then(url=>{
-          if(url){ img.src=url; img.onload=()=>img.style.opacity='1'; }
+          if(url){ img.src=url; }
         }).catch(()=>{});
+        cell.appendChild(img); strip.appendChild(cell);
       }
-      cell.appendChild(img); rowWrapper.appendChild(cell);
-    }
-    matrix.appendChild(rowWrapper);
-    if(hasImages){
-      const offset=layout.rowOffsets?.[r] || 0;
-      if(isStrip) startRowAnim(r, ids, cols, step, offset);
-      else startRowStrip(r, ids, cols, step, offset);
+
+      rowWrapper.appendChild(strip);
+      matrix.appendChild(rowWrapper);
+
+      if(hasImages){
+        const delay=layout.rowOffsets?.[r] || 0;
+        startStripAnim(strip, ids, cols, step, delay);
+      }
+    }else{
+      // Cell-Modus: Grid-Zellen
+      for(let c=0;c<cols;c++){
+        const cell=document.createElement('div');
+        cell.className='tv-cell';
+        cell.dataset.row=r; cell.dataset.col=c;
+        cell.style.cssText='position:relative;background:#000;overflow:hidden;';
+        const img=document.createElement('img');
+        img.alt=''; img.loading='eager';
+        img.style.cssText='width:100%;height:100%;object-fit:var(--crop-mode,cover);display:block;transition:opacity 0.5s ease;opacity:0;';
+        if(hasImages){
+          const slideId=ids[c%ids.length];
+          loadSlideImage(slideId).then(url=>{
+            if(url){ img.src=url; img.onload=()=>img.style.opacity='1'; }
+          }).catch(()=>{});
+        }
+        cell.appendChild(img); matrix.appendChild(cell);
+      }
+
+      if(hasImages){
+        const delay=layout.rowOffsets?.[r] || 0;
+        startCellAnim(r, ids, cols, step, delay);
+      }
     }
   }
   container.appendChild(matrix);
 }
 
-/* ROW ANIMATION — Strip-Modus: alle Zellen einer Zeile gleichzeitig */
-function startRowAnim(rowIdx, slideIds, cols, step, delay=0){
+/* CELL ANIMATION — Zellen-Modus: jede Zelle wechselt individuell (Stagger) */
+function startCellAnim(rowIdx, slideIds, cols, step, delay=0){
   const speed=config.slideshowSpeed||5000;
   const dur=transCfg.duration||1200;
   const transType=config.transitionType||'fade';
   let offset=0;
 
-  const getRowImgs=()=>{
-    const rowCells=document.querySelectorAll(`.tv-cell[data-row="${rowIdx}"]`);
-    return Array.from(rowCells).map(c=>c.querySelector('img'));
-  };
-
   const tick=async()=>{
     if(!slideIds.length) return;
-    const maxOffset=Math.max(1, slideIds.length - cols + 1);
-    offset=(offset+step)%maxOffset;
-    const imgs=getRowImgs();
+    // Voller Ringpuffer: offset läuft modulo slideIds.length
+    offset=(offset+step)%slideIds.length;
+    const matrix=document.querySelector('.tv-matrix'); if(!matrix) return;
+    const allCells=matrix.querySelectorAll('.tv-cell');
+    const rowCells=[];
+    for(let c=0;c<cols;c++) rowCells.push(allCells[rowIdx*cols+c]);
+
     for(let c=0;c<cols;c++){
       const idx=(offset+c)%slideIds.length;
       const url=await loadSlideImage(slideIds[idx]);
       if(!url) continue;
-      const img=imgs[c];
+      const img=rowCells[c]?.querySelector('img');
       if(!img) continue;
       applyTransition(img, url, img.src, transType, dur);
     }
@@ -157,30 +193,37 @@ function startRowAnim(rowIdx, slideIds, cols, step, delay=0){
   rowTimers.push(initial);
 }
 
-/* ROW STRIP — Cell-Modus: individuelle Zellen-Animation mit Stagger */
-function startRowStrip(rowIdx, slideIds, cols, step, delay=0){
+/* STRIP ANIMATION — Streifen-Modus: ganze Zeile scrollt horizontal */
+function startStripAnim(stripEl, slideIds, cols, step, delay=0){
   const speed=config.slideshowSpeed||5000;
   const dur=transCfg.duration||1200;
-  const transType=config.transitionType||'fade';
+  const total=slideIds.length;
+  if(!total) return;
+
+  const cellWidthPct=100/cols;
   let offset=0;
 
-  const tick=async()=>{
-    if(!slideIds.length) return;
-    const maxOffset=Math.max(1, slideIds.length - cols + 1);
-    offset=(offset+step)%maxOffset;
-    const matrix=document.querySelector('.tv-matrix'); if(!matrix) return;
-    const rowCells=[];
-    const allCells=matrix.querySelectorAll('.tv-cell');
-    for(let c=0;c<cols;c++) rowCells.push(allCells[rowIdx*cols+c]);
+  const tick=()=>{
+    const rawNext=offset+step;
+    const nextOffset=rawNext%total;
+    const isWrapping=rawNext>=total;
 
-    for(let c=0;c<cols;c++){
-      const idx=(offset+c)%slideIds.length;
-      const url=await loadSlideImage(slideIds[idx]);
-      if(!url) continue;
-      const img=rowCells[c]?.querySelector('img');
-      if(!img) continue;
-      applyTransition(img, url, img.src, transType, dur);
+    const targetX=-rawNext*cellWidthPct;
+
+    stripEl.style.transition=`transform ${dur}ms ${transCfg.easing||'ease-in-out'}`;
+    stripEl.style.transform=`translateX(${targetX}%)`;
+
+    if(isWrapping){
+      setTimeout(()=>{
+        stripEl.style.transition='none';
+        stripEl.style.transform=`translateX(${-nextOffset*cellWidthPct}%)`;
+        requestAnimationFrame(()=>{
+          stripEl.style.transition='';
+        });
+      }, dur);
     }
+
+    offset=nextOffset;
   };
 
   const initial=setTimeout(()=>{
