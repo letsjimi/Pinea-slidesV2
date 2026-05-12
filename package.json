@@ -1,0 +1,13 @@
+{
+  "name": "pinea-slides-v2",
+  "version": "3.0.0",
+  "description": "PINEA Slides V2 — Digital Signage for 2x TV Portrait (9:16) with Admin Panel",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "cors": "^2.8.5"
+  }
+}

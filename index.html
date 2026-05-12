@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1280, initial-scale=1.0">
+  <title>PINEA Slides — Admin</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body class="admin-body">
+
+<header class="topbar">
+  <h1>🖼️ PINEA Slides <span style="font-weight:400;color:#ff3366">v3.0</span></h1>
+  <span class="spacer"></span>
+  <span id="ipBadge" style="font-size:13px;color:#888;background:#14141a;padding:6px 14px;border-radius:8px;border:1px solid #2a2a30;">📡 localhost:3000</span>
+  <button class="btn btn-primary" onclick="startSlideshow()">▶ Start</button>
+</header>
+
+<nav class="tab-bar">
+  <button class="tab-btn active" data-tab="slides">🖼️ Slides</button>
+  <button class="tab-btn" data-tab="upload">⬆️ Upload</button>
+  <button class="tab-btn" data-tab="timeline">📊 Timeline</button>
+  <button class="tab-btn" data-tab="settings">⚙️ Einstellungen</button>
+  <button class="tab-btn" data-tab="links">🔗 Links</button>
+</nav>
+
+<main class="main">
+
+  <!-- TAB: SLIDES -->
+  <section id="tab-slides" class="tab-content active">
+    <div class="card">
+      <div class="row-header">
+        <h2>📁 Slide-Galerie</h2>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <select id="filterGroup" class="form-select"><option value="">Alle Gruppen</option></select>
+          <select id="filterTV" class="form-select">
+            <option value="">Alle TVs</option>
+            <option value="left">TV Links</option>
+            <option value="right">TV Rechts</option>
+            <option value="both">Beide</option>
+          </select>
+          <button class="btn btn-ghost" onclick="generateTestImages()">🎨 Testbilder</button>
+          <input type="number" id="testImageCount" value="6" min="1" max="24" style="width:60px;">
+        </div>
+      </div>
+      <div id="slideGrid" class="thumb-grid"></div>
+    </div>
+
+    <div class="card">
+      <h2>📂 Gruppen</h2>
+      <div id="groupList"></div>
+      <div class="group-add-form">
+        <input type="text" id="newGroupName" placeholder="Neue Gruppe...">
+        <input type="color" id="newGroupColor" value="#ff3366">
+        <button class="btn btn-primary" onclick="addGroup()">+ Hinzufügen</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- TAB: UPLOAD -->
+  <section id="tab-upload" class="tab-content">
+    <div class="card">
+      <h2>⬆️ Bilder hochladen</h2>
+      <p style="color:#888;font-size:14px;margin-bottom:16px;">Ziel-Gruppe auswählen:</p>
+      <div id="uploadGroupSelect" class="group-pills"></div>
+      <div id="uploadZone" class="upload-zone" style="margin-top:20px;">
+        <p>Dateien hier reinziehen oder klicken zum Auswählen</p>
+        <input type="file" id="fileInput" multiple accept="image/*">
+      </div>
+    </div>
+  </section>
+
+  <!-- TAB: TIMELINE -->
+  <section id="tab-timeline" class="tab-content">
+    <div class="card">
+      <div class="row-header">
+        <h2>📊 Timeline-Editor</h2>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <select id="timelineTV" class="form-select">
+            <option value="left">TV Links</option>
+            <option value="right">TV Rechts</option>
+          </select>
+        </div>
+      </div>
+      <div id="timelineControls" style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:20px;">
+        <div class="form-row" style="margin:0;"><label>Reihen:</label><input type="number" id="matrixRows" value="3" min="1" max="8" style="width:80px;"></div>
+        <div class="form-row" style="margin:0;"><label>Spalten:</label><input type="number" id="matrixCols" value="2" min="1" max="8" style="width:80px;"></div>
+        <div class="form-row" style="margin:0;"><label>Schritt:</label><input type="number" id="matrixStep" value="1" min="1" max="10" style="width:80px;"></div>
+        <div class="form-row" style="margin:0;"><label>Lücke (px):</label><input type="number" id="cellGap" value="4" min="0" max="50" style="width:80px;"></div>
+        <div class="form-row" style="margin:0;"><label>Stagger (ms):</label><input type="number" id="rowStagger" value="2000" min="0" max="20000" step="500" style="width:100px;"></div>
+        <button class="btn btn-primary" onclick="updateMatrixFromSettings()">Anwenden</button>
+      </div>
+      <div id="timelineRows"></div>
+      <div class="card" style="margin-top:20px;">
+        <h3>📦 Slide-Pool</h3>
+        <p style="color:#888;font-size:13px;margin-bottom:12px;">Bilder hier reinziehen, um sie den Zeilen zuzuweisen.</p>
+        <div id="slidePool" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:10px;max-height:300px;overflow-y:auto;"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TAB: SETTINGS -->
+  <section id="tab-settings" class="tab-content">
+    <div class="card">
+      <h2>🎛️ Einstellungen</h2>
+      <div class="form-row"><label>Grid sichtbar:</label><input type="checkbox" id="cfgGridVisible"></div>
+      <div class="form-row"><label>Grid-Farbe:</label><input type="color" id="cfgGridColor" value="#ff3366"></div>
+      <div class="form-row"><label>Grid-Opacity:</label><input type="number" id="cfgGridOpacity" min="0" max="1" step="0.05" value="0.4"></div>
+      <div class="form-row"><label>Grid-Strichstärke (px):</label><input type="number" id="cfgGridWidth" min="1" max="10" value="1"></div>
+      <div class="form-row"><label>Grid-Größe:</label>
+        <select id="cfgGridSize">
+          <option value="25%">2×2</option>
+          <option value="11.11%">3×3</option>
+          <option value="6.25%">4×4</option>
+          <option value="4.16%">6×6</option>
+          <option value="2.77%">8×8</option>
+          <option value="2.08%">10×10</option>
+          <option value="1.38%">12×12</option>
+        </select>
+      </div>
+      <div class="form-row"><label>Crop-Mode:</label>
+        <select id="cfgCropMode"><option value="cover">Cover</option><option value="contain">Contain</option></select>
+      </div>
+      <div class="form-row"><label>Übergang:</label>
+        <select id="cfgTransition">
+          <option value="fade">Fade</option>
+          <option value="slide">Slide</option>
+          <option value="zoom">Zoom</option>
+          <option value="flip">Flip</option>
+          <option value="wipe">Wipe</option>
+          <option value="kenburns">Ken Burns</option>
+        </select>
+      </div>
+      <div class="form-row"><label>Übergangs-Dauer (ms):</label><input type="number" id="cfgTransDuration" min="100" max="5000" step="100" value="1200"></div>
+      <div class="form-row"><label>Slideshow-Geschwindigkeit (ms):</label><input type="number" id="cfgSlideSpeed" min="1000" max="60000" step="500" value="5000"></div>
+      <div class="form-row"><label>Gruppen-Label zeigen:</label><input type="checkbox" id="cfgShowLabel" checked></div>
+      <div class="form-row"><label>Label-Position:</label>
+        <select id="cfgLabelPos"><option value="bottom">Unten</option><option value="top">Oben</option></select>
+      </div>
+      <div class="form-row"><label>Debug-Overlay (Strg+D):</label><input type="checkbox" id="cfgDebug"></div>
+      <button class="btn btn-primary" onclick="saveConfig()" style="margin-top:12px;">💾 Speichern</button>
+    </div>
+  </section>
+
+  <!-- TAB: LINKS -->
+  <section id="tab-links" class="tab-content">
+    <div class="card">
+      <h2>🔗 TV-Links</h2>
+      <div id="linkAdmin" class="link-box"></div>
+      <div id="linkLeft" class="link-box"></div>
+      <div id="linkRight" class="link-box"></div>
+    </div>
+  </section>
+
+</main>
+
+<div id="toastContainer" style="position:fixed;bottom:20px;right:20px;z-index:1000;"></div>
+
+<script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
+<script type="module" src="js/admin.js"></script>
+
+</body>
+</html>
