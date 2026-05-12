@@ -160,7 +160,8 @@ function startRowStrip(rowIdx, slideIds, cols, step, delay=0){
 
   const tick=async()=>{
     if(!slideIds.length) return;
-    offset=(offset+step)%slideIds.length;
+    const maxOffset=Math.max(1, slideIds.length - cols + 1);
+    offset=(offset+step)%maxOffset;
     const matrix=document.querySelector('.tv-matrix'); if(!matrix) return;
     const rowCells=[];
     const allCells=matrix.querySelectorAll('.tv-cell');
