@@ -19,8 +19,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 function detectIP() {
-  const h = window.location.hostname;
-  if (h !== 'localhost' && h !== '127.0.0.1') serverIP = h;
+  serverIP = window.location.hostname;
   const b = document.getElementById('ipBadge');
   if (b) b.textContent = `📡 ${serverIP}:3000`;
 }
@@ -259,5 +258,3 @@ window.saveConfig = saveConfig; window.loadConfig = loadConfig;
 function selectTransition(type){ currentTransition=type; document.querySelectorAll('.preset-card').forEach(c=>c.classList.remove('selected')); const t=document.querySelector(`.preset-card[data-type="${type}"]`); if(t) t.classList.add('selected'); }
 window.selectTransition = selectTransition;
 
-function startSlideshow() { window.open(`http://${serverIP}:3000/tv-left`,'tvLeft'); window.open(`http://${serverIP}:3000/tv-right`,'tvRight'); }
-window.startSlideshow = startSlideshow;

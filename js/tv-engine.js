@@ -8,16 +8,16 @@ const container=document.getElementById('tvContainer');
 
 export async function initTV(tv) {
   tvSide=tv; await initDB();
-  config=await db.config.get('global')||{};
+  config=await db.config.get('global')||DEFAULT_CONFIG;
   transCfg=config.transitionSettings||{duration:1200,easing:'ease-in-out'};
-  layout=await db.layouts.get(tvSide)||{rows:3,cols:2,timelines:[],step:1,useMatrix:true};
+  layout=await db.layouts.get(tvSide)||{rows:3,cols:2,timelines:[[],[],[]],step:1,useMatrix:true};
   applyConfig(); render();
   if(config.idleTimeout>0 && !layout.useMatrix) setupIdle();
   window.addEventListener('keydown',e=>{ if(e.key==='d' && e.ctrlKey){ e.preventDefault(); toggleDebug(); }});
 }
 
 function applyConfig() {
-  const grid=document.getElementById('gridOverlay'); grid?.classList.toggle('visible', config.gridVisible);
+  const grid=document.getElementById('gridOverlay'); if(grid) grid.classList.toggle('visible', config.gridVisible);
   document.documentElement.style.setProperty('--grid-color', config.gridColor||'#ff3366');
   document.documentElement.style.setProperty('--grid-opacity', config.gridOpacity||0.4);
   document.documentElement.style.setProperty('--grid-width', (config.gridWidthPx||1)+'px');
@@ -36,7 +36,8 @@ function applyConfig() {
 
 function render() {
   clearTimers(); clearBlobCache();
-  const existing=container.querySelector('.tv-matrix'); if(existing) existing.remove();
+  const existing=document.querySelector('.tv-matrix');
+  if(existing) existing.remove();
   layout.useMatrix?renderMatrix():renderSlideshow();
 }
 

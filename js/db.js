@@ -1,5 +1,5 @@
 // PINEA Slides V2 — Dexie Database
-const db = new Dexie('PineaSlidesV3');
+const db = new Dexie('PineaSlidesV4');
 db.version(1).stores({
     groups:   'id++, name, sortOrder',
     slides:   'id++, groupId, sortOrder',
