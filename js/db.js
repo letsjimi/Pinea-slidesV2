@@ -2,9 +2,16 @@
 const db = new Dexie('PineaSlidesV3');
 db.version(1).stores({
     groups:   'id++, name, sortOrder',
-    slides:   'id++, groupId, sortOrder, tvAssignment',
+    slides:   'id++, groupId, sortOrder',
     config:   'id',
     layouts:  'tvId'
+});
+db.version(2).stores({
+    slides:   'id++, groupId, sortOrder, tvAssignment',
+}).upgrade(async tx => {
+    await tx.table('slides').toCollection().modify(s => {
+        if (!s.tvAssignment) s.tvAssignment = 'both';
+    });
 });
 
 const DEFAULT_CONFIG = {

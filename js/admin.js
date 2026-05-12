@@ -26,10 +26,24 @@ function detectIP() {
 }
 function renderIPLinks() {
   const base = `http://${serverIP}:3000`;
-  setHtml('linkAdmin', `<a href="${base}/admin" target="_blank">${base}/admin</a>`);
-  setHtml('linkLeft', `<a href="${base}/tv-left" target="_blank">${base}/tv-left</a>`);
-  setHtml('linkRight', `<a href="${base}/tv-right" target="_blank">${base}/tv-right</a>`);
+  const aAdm = document.getElementById('linkAdminA');
+  const aL = document.getElementById('linkLeftA');
+  const aR = document.getElementById('linkRightA');
+  if (aAdm) { aAdm.href = `${base}/admin`; aAdm.textContent = `${base}/admin`; }
+  if (aL) { aL.href = `${base}/tv-left`; aL.textContent = `${base}/tv-left`; }
+  if (aR) { aR.href = `${base}/tv-right`; aR.textContent = `${base}/tv-right`; }
+  // Preview iframes
+  const pl = document.getElementById('previewLeft');
+  const pr = document.getElementById('previewRight');
+  if (pl) pl.src = `${base}/tv-left`;
+  if (pr) pr.src = `${base}/tv-right`;
 }
+
+function openTV(side) {
+  const url = `http://${serverIP}:3000/tv-${side}`;
+  window.open(url, `tv${side==='left'?'Left':'Right'}`);
+}
+window.openTV = openTV;
 function setHtml(id, html) { const el = document.getElementById(id); if(el) el.innerHTML = html; }
 
 /* TABS */
