@@ -276,17 +276,15 @@ function updateTransitionSettingsUI() {
   };
   const d = defs[currentTransition] || defs.fade;
   let html = '<h3>⚙️ '+d.label+'-Einstellungen</h3>';
-  html += '<div class="form-row"><label>Dauer (ms):</label><input type="number" id="transDur" min="100" max="5000" step="100" value="1200"></div>';
   html += '<div class="form-row"><label>Easing:</label><select id="transEase"><option value="ease">ease</option><option value="ease-in">ease-in</option><option value="ease-out">ease-out</option><option value="ease-in-out">ease-in-out</option><option value="linear">linear</option></select></div>';
   html += d.extra;
   container.innerHTML = html;
 }
 
 async function saveTransitionConfig() {
-  const dur = parseInt(document.getElementById('transDur')?.value) || 1200;
   const ease = document.getElementById('transEase')?.value || 'ease-in-out';
   const globalType = document.getElementById('transGlobalType')?.value || currentTransition;
-  const globalDur = parseInt(document.getElementById('transGlobalDur')?.value) || dur;
+  const globalDur = parseInt(document.getElementById('transGlobalDur')?.value) || 1200;
   const globalSpeed = parseInt(document.getElementById('transGlobalSpeed')?.value) || 5000;
   const cfg = {
     id:'global',
