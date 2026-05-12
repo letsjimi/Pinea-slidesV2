@@ -1,49 +1,96 @@
-// PINEA Admin — Timeline Matrix Editor v3
+// PINEA Admin — Timeline Matrix Editor v3.2
 import { db } from './db.js';
 
 let allSlides=[], layoutData={rows:3,cols:2,timelines:[[],[],[]],step:1,cellGap:4,useMatrix:true};
 let dragSrc=null, currentTV='left';
 
 export async function initTimelineEditor() {
-  await refreshTimelineData();
-  renderTVSelector(); renderPool(); renderAllRows();
+  console.log('[Timeline] initTimelineEditor() startet...');
+  try {
+    await refreshTimelineData();
+    renderTVSelector(); renderPool(); renderAllRows();
+    console.log('[Timeline] initTimelineEditor() fertig. Slides:', allSlides.length);
+  } catch(e) {
+    console.error('[Timeline] initTimelineEditor() FEHLER:', e);
+    toast('Timeline-Editor Fehler: ' + e.message, 'error');
+  }
 }
 
 async function refreshTimelineData() {
-  allSlides = await db.slides.toArray();
-  const saved = await db.layouts.get(currentTV);
-  if(saved) layoutData=saved; 
-  else { layoutData={tvId:currentTV,rows:3,cols:2,timelines:[[],[],[]],step:1,cellGap:4,useMatrix:true}; await db.layouts.put(layoutData); }
+  console.log('[Timeline] refreshTimelineData()...');
+  try {
+    allSlides = await db.slides.toArray();
+    console.log('[Timeline] allSlides geladen:', allSlides.length);
+    const saved = await db.layouts.get(currentTV);
+    if(saved) {
+      layoutData=saved;
+      console.log('[Timeline] Layout geladen für', currentTV, ':', layoutData);
+    } else {
+      layoutData={tvId:currentTV,rows:3,cols:2,timelines:[[],[],[]],step:1,cellGap:4,useMatrix:true};
+      await db.layouts.put(layoutData);
+      console.log('[Timeline] Default-Layout erstellt für', currentTV);
+    }
+  } catch(e) {
+    console.error('[Timeline] refreshTimelineData() FEHLER:', e);
+    throw e;
+  }
 }
 
 function renderTVSelector() {
-  const sel=document.getElementById('timelineTV'); if(!sel) return;
+  const sel=document.getElementById('timelineTV'); if(!sel) { console.warn('[Timeline] timelineTV nicht gefunden'); return; }
   sel.value=currentTV;
   sel.addEventListener('change',async()=>{currentTV=sel.value; await refreshTimelineData(); renderAllRows(); renderPool();});
 }
 
 /* POOL */
 function renderPool() {
-  const pool=document.getElementById('slidePool'); if(!pool) return;
+  const pool=document.getElementById('slidePool'); if(!pool) { console.warn('[Timeline] slidePool nicht gefunden'); return; }
   pool.querySelectorAll('img[data-blob]').forEach(img=>{ if(img.src?.startsWith('blob:')) URL.revokeObjectURL(img.src); });
-  const tvSlides=allSlides.filter(s=>s.tvAssignment===currentTV||s.tvAssignment==='both');
-  if(!tvSlides.length){ pool.innerHTML=`<div style="grid-column:1/-1;text-align:center;padding:20px;color:#555;font-size:14px;">Keine Bilder. Zuerst Slides hochladen und TV zuweisen.</div>`; return; }
+  console.log('[Timeline] renderPool() — allSlides:', allSlides.length, 'currentTV:', currentTV);
+
+  const tvSlides=allSlides.filter(s=>{
+    const hasBlob = s.imageBlob instanceof Blob;
+    const tvMatch = s.tvAssignment===currentTV || s.tvAssignment==='both';
+    return hasBlob && tvMatch;
+  });
+  console.log('[Timeline] renderPool() — tvSlides (gefiltert):', tvSlides.length);
+
+  if(!tvSlides.length){
+    console.log('[Timeline] Keine Bilder für', currentTV);
+    pool.innerHTML=`<div style="grid-column:1/-1;text-align:center;padding:20px;color:#555;font-size:14px;">
+      🚫 Keine Bilder für diesen TV.<br><br>
+      Lösung:<br>
+      1. Gehe zum <strong>Slides</strong>-Tab<br>
+      2. Erstelle Testbilder oder lade Bilder hoch<br>
+      3. Stelle sicher, dass die Bilder TV-Zuweisung haben (🔄 📺 klicken)
+    </div>`;
+    return;
+  }
   pool.innerHTML=tvSlides.map(s=>{
     const url=URL.createObjectURL(s.imageBlob);
-    return `<div class="timeline-pool-item" draggable="true" data-slide-id="${s.id}" ondragstart="window.timelineDragStart(event,${s.id})"><img src="${url}" alt="${s.name}" data-blob="1"><div class="pool-overlay"><div class="pool-dot" style="background:${s.groupColor||'#555'}"></div><div class="pool-name">${s.name.substring(0,16)}</div></div></div>`;
+    return `<div class="timeline-pool-item" draggable="true" data-slide-id="${s.id}" ondragstart="window.timelineDragStart(event,'${s.id}')">
+      <img src="${url}" alt="${s.name}" data-blob="1">
+      <div class="pool-overlay">
+        <div class="pool-dot" style="background:${s.groupColor||'#555'}"></div>
+        <div class="pool-name">${s.name.substring(0,16)}</div>
+      </div>
+    </div>`;
   }).join('');
+  console.log('[Timeline] renderPool() fertig —', tvSlides.length, 'Bilder gerendert');
 }
 
 window.timelineDragStart=function(e,slideId){
-  dragSrc={type:'pool',slideId};
+  console.log('[Timeline] DragStart — slideId:', slideId);
+  dragSrc={type:'pool',slideId:+slideId};
   e.dataTransfer.effectAllowed='copy';
   e.dataTransfer.setData('text/plain',JSON.stringify(dragSrc));
 };
 
 /* ROWS */
 function renderAllRows() {
-  const c=document.getElementById('timelineRows'); if(!c) return;
+  const c=document.getElementById('timelineRows'); if(!c) { console.warn('[Timeline] timelineRows nicht gefunden'); return; }
   const {rows,timelines}=layoutData;
+  console.log('[Timeline] renderAllRows() — rows:', rows, 'timelines:', timelines);
   if(!rows){ c.innerHTML=`<div style="text-align:center;padding:30px;color:#555;">Reihen > 0 einstellen.</div>`; return; }
   c.innerHTML=Array.from({length:rows},(_,ri)=>{
     const ids=timelines[ri]||[]; const has=ids.length>0;
@@ -57,6 +104,7 @@ function renderAllRows() {
         ${!has?`<div class="row-empty-hint">⬇️ Bilder aus dem Pool hier reinziehen</div>`:ids.map((sid,si)=>renderSlot(ri,si,sid)).join('')}
       </div></div>`;
   }).join('');
+  console.log('[Timeline] renderAllRows() fertig');
 }
 
 function renderSlot(rowIdx,slotIdx,slideId) {
