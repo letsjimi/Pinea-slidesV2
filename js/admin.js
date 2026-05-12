@@ -4,10 +4,11 @@ import { db, initDB, DEFAULT_CONFIG } from './db.js';
 let groups = [], slides = [], selectedUploadGroup = null, draggedSlide = null;
 let dbReady = false, timelineLoaded = false, currentTransition = 'fade';
 let serverIP = 'localhost';
+let serverURL = '';
 
 /* INIT */
 document.addEventListener('DOMContentLoaded', async () => {
-  setupTabs(); setupUpload(); detectIP(); renderIPLinks();
+  detectServer(); setupTabs(); setupUpload(); renderIPLinks();
   try {
     await initDB(); dbReady = true;
     await loadGroups(); await loadSlides(); await loadConfig();
@@ -18,20 +19,27 @@ document.addEventListener('DOMContentLoaded', async () => {
   } catch(err) { toast('Fehler beim Starten: ' + err.message, 'error'); }
 });
 
-function detectIP() {
-  serverIP = window.location.hostname;
+function detectServer() {
+  const h = window.location.hostname;
+  const isGitHub = h.includes('github.io');
+  if (isGitHub) {
+    serverURL = 'https://letsjimi.github.io/Pinea-slidesV2';
+    serverIP = 'GitHub Pages';
+  } else {
+    serverIP = h;
+    serverURL = `http://${h}:3000`;
+  }
   const b = document.getElementById('ipBadge');
-  if (b) b.textContent = `📡 ${serverIP}:3000`;
+  if (b) b.textContent = `📡 ${serverURL}`;
 }
+
 function renderIPLinks() {
-  const base = `http://${serverIP}:3000`;
   const ids = ['linkAdminA','linkLeftA','linkRightA'];
-  const urls = [`${base}/admin`,`${base}/tv-left`,`${base}/tv-right`];
+  const urls = [`${serverURL}/index.html`,`${serverURL}/tv-left.html`,`${serverURL}/tv-right.html`];
   ids.forEach((id,i) => {
     const el = document.getElementById(id);
     if (el) { el.href = urls[i]; el.textContent = urls[i]; }
   });
-  // Setze iframe-previews (wenn Tab sichtbar)
   const pl = document.getElementById('previewLeft');
   const pr = document.getElementById('previewRight');
   if (pl) pl.src = urls[1];
@@ -39,12 +47,11 @@ function renderIPLinks() {
 }
 
 window.startSlideshow = function() {
-  window.open(`http://${serverIP}:3000/tv-left`, '_blank');
-  window.open(`http://${serverIP}:3000/tv-right`, '_blank');
+  window.open(`${serverURL}/tv-left.html`, '_blank');
+  window.open(`${serverURL}/tv-right.html`, '_blank');
 };
-
 window.openTV = function(side) {
-  window.open(`http://${serverIP}:3000/tv-${side}`, '_blank');
+  window.open(`${serverURL}/tv-${side}.html`, '_blank');
 };
 
 /* TABS */
