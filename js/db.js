@@ -2,7 +2,7 @@
 const db = new Dexie('PineaSlidesV3');
 db.version(1).stores({
     groups:   'id++, name, sortOrder',
-    slides:   'id++, groupId, sortOrder',
+    slides:   'id++, groupId, sortOrder, tvAssignment',
     config:   'id',
     layouts:  'tvId'
 });
@@ -13,6 +13,7 @@ const DEFAULT_CONFIG = {
     gridVisible:     false,
     gridOpacity:     0.4,
     gridWidthPx:     1,
+    gridSize:        '25%',
     cropMode:        'cover',
     transitionType:  'fade',
     transitionSettings: { duration: 1200, easing: 'ease-in-out' },

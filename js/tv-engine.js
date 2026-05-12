@@ -23,6 +23,11 @@ function applyConfig() {
   document.documentElement.style.setProperty('--grid-width', (config.gridWidthPx||1)+'px');
   document.documentElement.style.setProperty('--grid-size', config.gridSize||'25%');
   document.documentElement.style.setProperty('--crop-mode', config.cropMode||'cover');
+  document.documentElement.style.setProperty('--label-text', config.labelColor||'#ffffff');
+  const label=document.getElementById('groupLabel');
+  if(label){ label.classList.remove('position-top','position-bottom');
+    label.classList.add(config.groupLabelPos==='top'?'position-top':'position-bottom');
+  }
 }
 
 function render() {

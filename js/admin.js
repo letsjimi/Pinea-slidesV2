@@ -200,20 +200,40 @@ window.slideDragStart=slideDragStart; window.slideDrop=slideDrop; window.slideDr
 /* SETTINGS */
 async function loadConfig() {
   const cfg = await db.config.get('global') || DEFAULT_CONFIG;
-  const set = (id, val) => { const el=document.getElementById(id); if(el){ if(el.type==='checkbox') el.checked=!!val; else el.value=val; } };
-  set('cfgGridVisible', cfg.gridVisible); set('cfgGridColor', cfg.gridColor); set('cfgGridOpacity', cfg.gridOpacity); set('cfgGridWidth', cfg.gridWidthPx);
-  set('cfgGridSize', cfg.gridSize||'25%'); set('cfgCropMode', cfg.cropMode); set('cfgTransition', cfg.transitionType); set('cfgTransDuration', cfg.transitionSettings?.duration||1200);
-  set('cfgSlideSpeed', cfg.slideshowSpeed||5000); set('cfgShowLabel', cfg.showGroupLabel); set('cfgLabelPos', cfg.groupLabelPos); set('cfgDebug', cfg.debugOverlay);
+  const set = (id, val) => { const el=document.getElementById(id); if(el){ if(el.type==='checkbox') el.checked=!!val; else el.value=val||''; } };
+  set('cfgGridVisible', cfg.gridVisible);
+  set('cfgGridColor', cfg.gridColor);
+  set('cfgGridOpacity', cfg.gridOpacity);
+  set('cfgGridWidth', cfg.gridWidthPx);
+  set('cfgGridSize', cfg.gridSize || '25%');
+  set('cfgCropMode', cfg.cropMode);
+  set('cfgTransition', cfg.transitionType);
+  set('cfgTransDuration', cfg.transitionSettings?.duration || 1200);
+  set('cfgSlideSpeed', cfg.slideshowSpeed || 5000);
+  set('cfgShowLabel', cfg.showGroupLabel);
+  set('cfgLabelPos', cfg.groupLabelPos);
+  set('cfgDebug', cfg.debugOverlay);
 }
+
 async function saveConfig() {
   const get = id => { const el=document.getElementById(id); if(!el) return undefined; return el.type==='checkbox'?el.checked:el.value; };
   const cfg = {
-    id:'global', gridVisible:get('cfgGridVisible'), gridColor:get('cfgGridColor'), gridOpacity:parseFloat(get('cfgGridOpacity')),
-    gridWidthPx:parseInt(get('cfgGridWidth')), gridSize:get('cfgGridSize'), cropMode:get('cfgCropMode'), transitionType:get('cfgTransition'),
-    transitionSettings:{duration:parseInt(get('cfgTransDuration')||1200), easing:'ease-in-out'},
-    slideshowSpeed:parseInt(get('cfgSlideSpeed')||5000), showGroupLabel:get('cfgShowLabel'), groupLabelPos:get('cfgLabelPos'), debugOverlay:get('cfgDebug')
+    id:'global',
+    gridVisible: get('cfgGridVisible'),
+    gridColor: get('cfgGridColor'),
+    gridOpacity: parseFloat(get('cfgGridOpacity')),
+    gridWidthPx: parseInt(get('cfgGridWidth')),
+    gridSize: get('cfgGridSize'),
+    cropMode: get('cfgCropMode'),
+    transitionType: get('cfgTransition'),
+    transitionSettings:{ duration: parseInt(get('cfgTransDuration')||1200), easing:'ease-in-out' },
+    slideshowSpeed: parseInt(get('cfgSlideSpeed')||5000),
+    showGroupLabel: get('cfgShowLabel'),
+    groupLabelPos: get('cfgLabelPos'),
+    debugOverlay: get('cfgDebug')
   };
-  await db.config.put(cfg); toast('Einstellungen gespeichert','success');
+  await db.config.put(cfg);
+  toast('Einstellungen gespeichert','success');
 }
 window.saveConfig = saveConfig; window.loadConfig = loadConfig;
 
