@@ -14,6 +14,8 @@ const DEFAULT_CONFIG = {
     gridOpacity:     0.4,
     gridWidthPx:     1,
     gridSize:        '25%',
+    gridCols:        2,
+    gridRows:        2,
     cropMode:        'cover',
     transitionType:  'fade',
     transitionSettings: { duration: 1200, easing: 'ease-in-out' },

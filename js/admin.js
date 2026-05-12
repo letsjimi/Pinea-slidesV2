@@ -205,7 +205,8 @@ async function loadConfig() {
   set('cfgGridColor', cfg.gridColor);
   set('cfgGridOpacity', cfg.gridOpacity);
   set('cfgGridWidth', cfg.gridWidthPx);
-  set('cfgGridSize', cfg.gridSize || '25%');
+  set('cfgGridCols', cfg.gridCols || 2);
+  set('cfgGridRows', cfg.gridRows || 2);
   set('cfgCropMode', cfg.cropMode);
   set('cfgTransition', cfg.transitionType);
   set('cfgTransDuration', cfg.transitionSettings?.duration || 1200);
@@ -223,7 +224,8 @@ async function saveConfig() {
     gridColor: get('cfgGridColor'),
     gridOpacity: parseFloat(get('cfgGridOpacity')),
     gridWidthPx: parseInt(get('cfgGridWidth')),
-    gridSize: get('cfgGridSize'),
+    gridCols: parseInt(get('cfgGridCols')),
+    gridRows: parseInt(get('cfgGridRows')),
     cropMode: get('cfgCropMode'),
     transitionType: get('cfgTransition'),
     transitionSettings:{ duration: parseInt(get('cfgTransDuration')||1200), easing:'ease-in-out' },

@@ -21,7 +21,11 @@ function applyConfig() {
   document.documentElement.style.setProperty('--grid-color', config.gridColor||'#ff3366');
   document.documentElement.style.setProperty('--grid-opacity', config.gridOpacity||0.4);
   document.documentElement.style.setProperty('--grid-width', (config.gridWidthPx||1)+'px');
-  document.documentElement.style.setProperty('--grid-size', config.gridSize||'25%');
+  const gc = config.gridCols || 2;
+  const gr = config.gridRows || 2;
+  const szX = (100 / gc) + '%';
+  const szY = (100 / gr) + '%';
+  document.documentElement.style.setProperty('--grid-size', szX + ' ' + szY);
   document.documentElement.style.setProperty('--crop-mode', config.cropMode||'cover');
   document.documentElement.style.setProperty('--label-text', config.labelColor||'#ffffff');
   const label=document.getElementById('groupLabel');
