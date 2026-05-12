@@ -98,11 +98,13 @@ function startRowStrip(rowIdx, slideIds, cols, step, delay=0){
   const speed=config.slideshowSpeed||5000;
   const dur=transCfg.duration||1200;
   const transType=config.transitionType||'fade';
-  let offset=0;
+  let offset=0, cycleCount=0;
 
   const tick=async()=>{
     if(!slideIds.length) return;
-    offset=(offset+step)%slideIds.length;
+    offset=(offset+1)%slideIds.length;
+    cycleCount++;
+    if(cycleCount>=slideIds.length){ offset=0; cycleCount=0; }
     const matrix=document.querySelector('.tv-matrix'); if(!matrix) return;
     const rowCells=[];
     const allCells=matrix.querySelectorAll('.tv-cell');

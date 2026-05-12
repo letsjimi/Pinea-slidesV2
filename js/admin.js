@@ -230,10 +230,11 @@ async function loadConfig() {
   set('cfgGridCols', cfg.gridCols || 2);
   set('cfgGridRows', cfg.gridRows || 2);
   set('cfgCropMode', cfg.cropMode);
-  set('cfgTransition', cfg.transitionType);
-  set('cfgTransDuration', cfg.transitionSettings?.duration || 1200);
-  set('cfgSlideSpeed', cfg.slideshowSpeed || 5000);
   set('cfgShowLabel', cfg.showGroupLabel);
+  // Übergänge-Tab global fields
+  set('transGlobalType', cfg.transitionType || 'fade');
+  set('transGlobalDur', cfg.transitionSettings?.duration || 1200);
+  set('transGlobalSpeed', cfg.slideshowSpeed || 5000);
   set('cfgLabelPos', cfg.groupLabelPos);
   set('cfgDebug', cfg.debugOverlay);
 }
@@ -249,9 +250,6 @@ async function saveConfig() {
     gridCols: parseInt(get('cfgGridCols')),
     gridRows: parseInt(get('cfgGridRows')),
     cropMode: get('cfgCropMode'),
-    transitionType: get('cfgTransition'),
-    transitionSettings:{ duration: parseInt(get('cfgTransDuration')||1200), easing:'ease-in-out' },
-    slideshowSpeed: parseInt(get('cfgSlideSpeed')||5000),
     showGroupLabel: get('cfgShowLabel'),
     groupLabelPos: get('cfgLabelPos'),
     debugOverlay: get('cfgDebug')
@@ -262,7 +260,7 @@ async function saveConfig() {
 window.saveConfig = saveConfig; window.loadConfig = loadConfig;
 
 /* TRANSITIONS */
-function selectTransition(type){ currentTransition=type; document.querySelectorAll('.preset-card').forEach(c=>c.classList.remove('selected')); const t=document.querySelector(`.preset-card[data-type="${type}"]`); if(t) t.classList.add('selected'); updateTransitionSettingsUI(); }
+function selectTransition(type){ currentTransition=type; const g=document.getElementById('transGlobalType'); if(g) g.value=type; document.querySelectorAll('.preset-card').forEach(c=>c.classList.remove('selected')); const t=document.querySelector(`.preset-card[data-type="${type}"]`); if(t) t.classList.add('selected'); updateTransitionSettingsUI(); }
 window.selectTransition = selectTransition;
 
 function updateTransitionSettingsUI() {
@@ -287,10 +285,14 @@ function updateTransitionSettingsUI() {
 async function saveTransitionConfig() {
   const dur = parseInt(document.getElementById('transDur')?.value) || 1200;
   const ease = document.getElementById('transEase')?.value || 'ease-in-out';
+  const globalType = document.getElementById('transGlobalType')?.value || currentTransition;
+  const globalDur = parseInt(document.getElementById('transGlobalDur')?.value) || dur;
+  const globalSpeed = parseInt(document.getElementById('transGlobalSpeed')?.value) || 5000;
   const cfg = {
     id:'global',
-    transitionType: currentTransition,
-    transitionSettings: { duration:dur, easing:ease }
+    transitionType: globalType,
+    transitionSettings: { duration:globalDur, easing:ease },
+    slideshowSpeed: globalSpeed
   };
   if(currentTransition==='slide') cfg.transitionSettings.direction = document.getElementById('transDirection')?.value || 'left';
   if(currentTransition==='zoom') cfg.transitionSettings.zoomScale = parseFloat(document.getElementById('transZoomScale')?.value) || 1.5;
