@@ -262,6 +262,48 @@ async function saveConfig() {
 window.saveConfig = saveConfig; window.loadConfig = loadConfig;
 
 /* TRANSITIONS */
-function selectTransition(type){ currentTransition=type; document.querySelectorAll('.preset-card').forEach(c=>c.classList.remove('selected')); const t=document.querySelector(`.preset-card[data-type="${type}"]`); if(t) t.classList.add('selected'); }
+function selectTransition(type){ currentTransition=type; document.querySelectorAll('.preset-card').forEach(c=>c.classList.remove('selected')); const t=document.querySelector(`.preset-card[data-type="${type}"]`); if(t) t.classList.add('selected'); updateTransitionSettingsUI(); }
 window.selectTransition = selectTransition;
+
+function updateTransitionSettingsUI() {
+  const container = document.getElementById('transitionSettings');
+  if(!container) return;
+  const defs = {
+    fade: { label:'Fade', extra:'' },
+    slide: { label:'Slide', extra:'<div class="form-row"><label>Richtung:</label><select id="transDirection"><option value="left">← Links</option><option value="right">→ Rechts</option><option value="up">↑ Oben</option><option value="down">↓ Unten</option></select></div>' },
+    zoom: { label:'Zoom', extra:'<div class="form-row"><label>Zoom-Faktor:</label><input type="number" id="transZoomScale" min="1.1" max="3" step="0.1" value="1.5"></div>' },
+    flip: { label:'Flip', extra:'<div class="form-row"><label>Achse:</label><select id="transFlipAxis"><option value="X">X (Horizontal)</option><option value="Y">Y (Vertikal)</option></select></div>' },
+    wipe: { label:'Wipe', extra:'<div class="form-row"><label>Richtung:</label><select id="transWipeDir"><option value="left">← Links</option><option value="right">→ Rechts</option><option value="up">↑ Oben</option><option value="down">↓ Unten</option></select></div>' },
+    kenburns: { label:'Ken Burns', extra:'' }
+  };
+  const d = defs[currentTransition] || defs.fade;
+  let html = '<h3>⚙️ '+d.label+'-Einstellungen</h3>';
+  html += '<div class="form-row"><label>Dauer (ms):</label><input type="number" id="transDur" min="100" max="5000" step="100" value="1200"></div>';
+  html += '<div class="form-row"><label>Easing:</label><select id="transEase"><option value="ease">ease</option><option value="ease-in">ease-in</option><option value="ease-out">ease-out</option><option value="ease-in-out">ease-in-out</option><option value="linear">linear</option></select></div>';
+  html += d.extra;
+  container.innerHTML = html;
+}
+
+async function saveTransitionConfig() {
+  const dur = parseInt(document.getElementById('transDur')?.value) || 1200;
+  const ease = document.getElementById('transEase')?.value || 'ease-in-out';
+  const cfg = {
+    id:'global',
+    transitionType: currentTransition,
+    transitionSettings: { duration:dur, easing:ease }
+  };
+  if(currentTransition==='slide') cfg.transitionSettings.direction = document.getElementById('transDirection')?.value || 'left';
+  if(currentTransition==='zoom') cfg.transitionSettings.zoomScale = parseFloat(document.getElementById('transZoomScale')?.value) || 1.5;
+  if(currentTransition==='flip') cfg.transitionSettings.flipAxis = document.getElementById('transFlipAxis')?.value || 'X';
+  if(currentTransition==='wipe') cfg.transitionSettings.wipeDirection = document.getElementById('transWipeDir')?.value || 'left';
+  await db.config.update('global', cfg);
+  toast('Übergang gespeichert','success');
+}
+window.saveTransitionConfig = saveTransitionConfig;
+
+function testTransition() {
+  const testUrl = serverURL + '/tv-left.html';
+  window.open(testUrl, '_blank');
+}
+window.testTransition = testTransition;
 

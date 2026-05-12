@@ -20,6 +20,7 @@
   <button class="tab-btn" data-tab="upload">⬆️ Upload</button>
   <button class="tab-btn" data-tab="timeline">📊 Timeline</button>
   <button class="tab-btn" data-tab="settings">⚙️ Einstellungen</button>
+  <button class="tab-btn" data-tab="transitions">✨ Übergänge</button>
   <button class="tab-btn" data-tab="links">🔗 Links</button>
 </nav>
 
@@ -135,6 +136,51 @@
       </div>
       <div class="form-row"><label>Debug-Overlay (Strg+D):</label><input type="checkbox" id="cfgDebug"></div>
       <button class="btn btn-primary" onclick="saveConfig()" style="margin-top:12px;">💾 Speichern</button>
+    </div>
+  </section>
+
+  <!-- TAB: TRANSITIONS -->
+  <section id="tab-transitions" class="tab-content">
+    <div class="card">
+      <h2>✨ Übergangs-Effekte</h2>
+      <p style="color:#888;font-size:13px;margin-bottom:16px;">Wähle den gewünschten Effekt und passe die Einstellungen an.</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin:16px 0;">
+        <div class="preset-card" data-type="fade" onclick="window.selectTransition('fade')">
+          <div style="width:100%;aspect-ratio:9/16;background:linear-gradient(#333,#111);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:32px;">↗️</div>
+          <strong style="display:block;margin-top:8px;color:#fff;font-size:13px;">Fade</strong>
+          <span style="font-size:11px;color:#666;">Weich überblenden</span>
+        </div>
+        <div class="preset-card" data-type="slide" onclick="window.selectTransition('slide')">
+          <div style="width:100%;aspect-ratio:9/16;background:linear-gradient(#333,#111);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:32px;">↔️</div>
+          <strong style="display:block;margin-top:8px;color:#fff;font-size:13px;">Slide</strong>
+          <span style="font-size:11px;color:#666;">Rein-/Rausgleiten</span>
+        </div>
+        <div class="preset-card" data-type="zoom" onclick="window.selectTransition('zoom')">
+          <div style="width:100%;aspect-ratio:9/16;background:linear-gradient(#333,#111);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:32px;">🔍</div>
+          <strong style="display:block;margin-top:8px;color:#fff;font-size:13px;">Zoom</strong>
+          <span style="font-size:11px;color:#666;">Rein-/Rauszoomen</span>
+        </div>
+        <div class="preset-card" data-type="flip" onclick="window.selectTransition('flip')">
+          <div style="width:100%;aspect-ratio:9/16;background:linear-gradient(#333,#111);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:32px;">🔃</div>
+          <strong style="display:block;margin-top:8px;color:#fff;font-size:13px;">Flip</strong>
+          <span style="font-size:11px;color:#666;">Drehen</span>
+        </div>
+        <div class="preset-card" data-type="wipe" onclick="window.selectTransition('wipe')">
+          <div style="width:100%;aspect-ratio:9/16;background:linear-gradient(#333,#111);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:32px;">🧹</div>
+          <strong style="display:block;margin-top:8px;color:#fff;font-size:13px;">Wipe</strong>
+          <span style="font-size:11px;color:#666;">Wischen</span>
+        </div>
+        <div class="preset-card" data-type="kenburns" onclick="window.selectTransition('kenburns')">
+          <div style="width:100%;aspect-ratio:9/16;background:linear-gradient(#333,#111);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:32px;">📷</div>
+          <strong style="display:block;margin-top:8px;color:#fff;font-size:13px;">Ken Burns</strong>
+          <span style="font-size:11px;color:#666;">Langsamer Zoom</span>
+        </div>
+      </div>
+      <div id="transitionSettings"></div>
+      <div style="display:flex;gap:12px;margin-top:16px;">
+        <button class="btn btn-primary" onclick="saveTransitionConfig()">💾 Übergang speichern</button>
+        <button class="btn btn-ghost" onclick="testTransition()">👁️ Testen</button>
+      </div>
     </div>
   </section>
 

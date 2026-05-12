@@ -161,6 +161,13 @@ html,body{width:100%;height:100%;background:var(--bg);overflow:hidden;font-famil
 .toast.info{border-color:#333}
 @keyframes toastIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
 
+/* preset cards */
+.preset-card{background:#14141a;border:2px solid #2a2a30;border-radius:10px;padding:12px;cursor:pointer;transition:border-color .2s,transform .1s;text-align:center}
+.preset-card:hover{border-color:#555;transform:scale(1.02)}
+.preset-card.selected{border-color:#ff3366;box-shadow:0 0 0 2px #ff3366}
+.preset-card strong{display:block;margin-top:8px;color:#fff;font-size:13px}
+.preset-card span{font-size:11px;color:#666}
+
 /* mobile fallback */
 @media(max-width:768px){
   .main{padding:12px}
