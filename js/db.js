@@ -7,7 +7,10 @@ db.version(1).stores({
     layouts:  'tvId'
 });
 db.version(2).stores({
+    groups:   'id++, name, sortOrder',
     slides:   'id++, groupId, sortOrder, tvAssignment',
+    config:   'id',
+    layouts:  'tvId'
 }).upgrade(async tx => {
     await tx.table('slides').toCollection().modify(s => {
         if (!s.tvAssignment) s.tvAssignment = 'both';

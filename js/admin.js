@@ -26,25 +26,27 @@ function detectIP() {
 }
 function renderIPLinks() {
   const base = `http://${serverIP}:3000`;
-  const aAdm = document.getElementById('linkAdminA');
-  const aL = document.getElementById('linkLeftA');
-  const aR = document.getElementById('linkRightA');
-  if (aAdm) { aAdm.href = `${base}/admin`; aAdm.textContent = `${base}/admin`; }
-  if (aL) { aL.href = `${base}/tv-left`; aL.textContent = `${base}/tv-left`; }
-  if (aR) { aR.href = `${base}/tv-right`; aR.textContent = `${base}/tv-right`; }
-  // Preview iframes
+  const ids = ['linkAdminA','linkLeftA','linkRightA'];
+  const urls = [`${base}/admin`,`${base}/tv-left`,`${base}/tv-right`];
+  ids.forEach((id,i) => {
+    const el = document.getElementById(id);
+    if (el) { el.href = urls[i]; el.textContent = urls[i]; }
+  });
+  // Setze iframe-previews (wenn Tab sichtbar)
   const pl = document.getElementById('previewLeft');
   const pr = document.getElementById('previewRight');
-  if (pl) pl.src = `${base}/tv-left`;
-  if (pr) pr.src = `${base}/tv-right`;
+  if (pl) pl.src = urls[1];
+  if (pr) pr.src = urls[2];
 }
 
-function openTV(side) {
-  const url = `http://${serverIP}:3000/tv-${side}`;
-  window.open(url, `tv${side==='left'?'Left':'Right'}`);
-}
-window.openTV = openTV;
-function setHtml(id, html) { const el = document.getElementById(id); if(el) el.innerHTML = html; }
+window.startSlideshow = function() {
+  window.open(`http://${serverIP}:3000/tv-left`, '_blank');
+  window.open(`http://${serverIP}:3000/tv-right`, '_blank');
+};
+
+window.openTV = function(side) {
+  window.open(`http://${serverIP}:3000/tv-${side}`, '_blank');
+};
 
 /* TABS */
 function setupTabs() {
