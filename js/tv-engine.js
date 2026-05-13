@@ -119,17 +119,16 @@ function renderMatrix() {
       const strip=document.createElement('div');
       strip.className='tv-strip';
       strip.dataset.row=r;
-      strip.style.cssText=`display:flex;height:100%;`;
+      const totalGap=(cols-1)*rowGap;
+      strip.style.cssText=`display:flex;height:100%;gap:${rowGap}px;`;
       const displayIds=[...ids,...ids,...ids];
 
       for(let i=0;i<displayIds.length;i++){
         const slideId=displayIds[i];
         const cell=document.createElement('div');
         cell.className='tv-strip-cell';
-        // Breite basiert auf rowWrapper (100% Container), nicht strip
-        const isLastInBlock=(i+1)%cols===0;
-        const gapStyle=isLastInBlock?'':`margin-right:${rowGap}px;`;
-        cell.style.cssText=`width:calc(100%/${cols});height:100%;flex-shrink:0;position:relative;overflow:hidden;${gapStyle}`;
+        // Korrekte Breite: (Container - TotalGap) / cols, damit mit CSS gap alles passt
+        cell.style.cssText=`width:calc((100% - ${totalGap}px)/${cols});height:100%;flex-shrink:0;position:relative;overflow:hidden;`;
         const img=document.createElement('img');
         img.alt=''; img.loading='eager';
         img.style.cssText='width:100%;height:100%;object-fit:var(--crop-mode,cover);display:block;';
@@ -142,7 +141,7 @@ function renderMatrix() {
 
       if(hasImages){
         const delay=layout.rowOffsets?.[r] || 0;
-        startStripAnim(strip, ids, cols, step, delay);
+        startStripAnim(strip, ids, cols, step, delay, rowGap);
       }
     }else{
       for(let c=0;c<cols;c++){
@@ -210,29 +209,34 @@ function startCellAnim(rowIdx, slideIds, cols, step, delay=0){
 }
 
 /* STRIP ANIMATION */
-function startStripAnim(stripEl, slideIds, cols, step, delay=0){
+function startStripAnim(stripEl, slideIds, cols, step, delay=0, gap=0){
   const speed=config.slideshowSpeed||5000;
   const dur=transCfg.duration||1200;
   const total=slideIds.length;
   if(!total) return;
 
   let offset=0;
-  const cellWidthPct=100/cols;
 
   const tick=()=>{
     const rawNext=offset+step;
     const nextOffset=rawNext%total;
     const isWrapping=rawNext>=total;
 
-    const targetX=-rawNext*cellWidthPct;
+    // Pixelgenaue Verschiebung: eine "cols-Gruppe" = Breite einer Zeile im DOM (inkl. Gaps)
+    // Wir nutzen die Breite des Parent (rowWrapper), da strip die Breite des Inhalts hat
+    const blockWidth=stripEl.parentElement?.clientWidth||stripEl.clientWidth;
+    const totalGapInBlock=(cols-1)*gap;
+    const cellPlusGap=(blockWidth+totalGapInBlock)/cols; // Breite einer Zelle inkl. ihres Gap-Anteils
+
+    const targetX=-rawNext*cellPlusGap;
 
     stripEl.style.transition=`transform ${dur}ms ${transCfg.easing||'ease-in-out'}`;
-    stripEl.style.transform=`translateX(${targetX}%)`;
+    stripEl.style.transform=`translateX(${targetX}px)`;
 
     if(isWrapping){
       setTimeout(()=>{
         stripEl.style.transition='none';
-        stripEl.style.transform=`translateX(${-nextOffset*cellWidthPct}%)`;
+        stripEl.style.transform=`translateX(${-nextOffset*cellPlusGap}px)`;
         requestAnimationFrame(()=>{ stripEl.style.transition=''; });
       }, dur);
     }
