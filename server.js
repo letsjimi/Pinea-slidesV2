@@ -76,6 +76,12 @@ function setupPublicAPI(app){
     res.json(l);
   });
   app.get('/api/slides', (req,res)=>res.json(loadJSON(SLIDES_FILE,[])));
+  app.get('/api/slides/:id', (req,res)=>{
+    const slides=loadJSON(SLIDES_FILE,[]);
+    const s=slides.find(x=>x.id==req.params.id);
+    if(!s) return res.status(404).json({error:'Not found'});
+    res.json({slide:s});
+  });
   app.get('/api/groups', (req,res)=>res.json(loadJSON(GROUPS_FILE,[])));
   app.get('/api/images/:name', (req,res)=>{
     const p=path.join(IMG_DIR, path.basename(req.params.name));

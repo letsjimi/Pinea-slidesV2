@@ -48,9 +48,12 @@ function detectServer() {
   if (isGitHub) {
     serverURL = 'https://letsjimi.github.io/Pinea-slidesV2';
     serverIP = 'GitHub Pages';
+  } else if (h.includes('timonlivesound.com') || h.includes('cloudflare')) {
+    serverURL = window.location.origin;
+    serverIP = h;
   } else {
     serverIP = h;
-    serverURL = `http://${h}:3000`;
+    serverURL = `http://${h}:8090`;
   }
   const b = document.getElementById('ipBadge');
   if (b) b.textContent = `📡 ${serverURL}`;
@@ -58,7 +61,15 @@ function detectServer() {
 
 function renderIPLinks() {
   const ids = ['linkAdminA','linkLeftA','linkRightA'];
-  const urls = [`${serverURL}/index.html`,`${serverURL}/tv-left.html`,`${serverURL}/tv-right.html`];
+  let leftURL, rightURL;
+  if (serverURL.includes('timonlivesound.com')) {
+    leftURL = 'https://tvleft.timonlivesound.com';
+    rightURL = 'https://tvright.timonlivesound.com';
+  } else {
+    leftURL = `http://${serverIP}:8091`;
+    rightURL = `http://${serverIP}:8092`;
+  }
+  const urls = [serverURL + '/', leftURL + '/', rightURL + '/'];
   ids.forEach((id,i) => {
     const el = document.getElementById(id);
     if (el) { el.href = urls[i]; el.textContent = urls[i]; }
@@ -69,12 +80,19 @@ function renderIPLinks() {
   if (pr) pr.src = urls[2];
 }
 
+function getTVBase(side) {
+  if (serverURL.includes('timonlivesound.com')) {
+    return side==='left' ? 'https://tvleft.timonlivesound.com' : 'https://tvright.timonlivesound.com';
+  }
+  return `http://${serverIP}:${side==='left'?8091:8092}`;
+}
+
 window.startSlideshow = function() {
-  window.open(`${serverURL}/tv-left.html`, '_blank');
-  window.open(`${serverURL}/tv-right.html`, '_blank');
+  window.open(getTVBase('left') + '/', '_blank');
+  window.open(getTVBase('right') + '/', '_blank');
 };
 window.openTV = function(side) {
-  window.open(`${serverURL}/tv-${side}.html`, '_blank');
+  window.open(getTVBase(side) + '/', '_blank');
 };
 
 /* TABS */

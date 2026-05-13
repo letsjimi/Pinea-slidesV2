@@ -47,6 +47,24 @@ function table(name){
         if(name==='slides') return api.deleteSlide(id).then(()=>id);
         return Promise.resolve(id);
     };
+    t.where = (field) => {
+        const chain = {
+            _vals: [],
+            anyOf: (...vals) => { chain._vals = vals; return chain; },
+            equals: (val) => { chain._vals = [val]; return chain; },
+            sortBy: async (sortField) => {
+                const arr = await t.toArray();
+                const vals = chain._vals || [];
+                const key = field === 'tvAssignment' ? 'tvAssignment' : field;
+                const filtered = arr.filter(x => vals.some(v => x[key] === v || String(x[key]) === String(v)));
+                return filtered.sort((a,b) => (a.sortOrder||0) - (b.sortOrder||0));
+            }
+        };
+        return {
+            anyOf: (...vals) => chain.anyOf(...vals),
+            equals: (val) => chain.equals(val),
+        };
+    };
     return t;
 }
 
