@@ -209,16 +209,15 @@ function startStripAnim(stripEl, slideIds, cols, step, delay=0){
   if(!total) return;
 
   let offset=0;
+  const blockWidth=stripEl.parentElement?.clientWidth||stripEl.clientWidth;
+  const cellWidth=blockWidth/cols; // Eine Zellenbreite = Viewport / cols
 
   const tick=()=>{
     const rawNext=offset+step;
     const nextOffset=rawNext%total;
     const isWrapping=rawNext>=total;
 
-    // Dynamische Blockbreite = Breite des rowWrapper (Parent)
-    const blockWidth=stripEl.parentElement?.clientWidth||stripEl.clientWidth;
-    const shiftPerStep=blockWidth/total;
-    const targetX=-rawNext*shiftPerStep;
+    const targetX=-rawNext*cellWidth;
 
     stripEl.style.transition=`transform ${dur}ms ${transCfg.easing||'ease-in-out'}`;
     stripEl.style.transform=`translateX(${targetX}px)`;
@@ -226,7 +225,7 @@ function startStripAnim(stripEl, slideIds, cols, step, delay=0){
     if(isWrapping){
       setTimeout(()=>{
         stripEl.style.transition='none';
-        stripEl.style.transform=`translateX(${-nextOffset*shiftPerStep}px)`;
+        stripEl.style.transform=`translateX(${-nextOffset*cellWidth}px)`;
         requestAnimationFrame(()=>{ stripEl.style.transition=''; });
       }, dur);
     }
