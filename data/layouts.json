@@ -1,0 +1,72 @@
+{
+  "left": {
+    "tvId": "left",
+    "rows": 3,
+    "cols": 2,
+    "timelines": [
+      [],
+      [],
+      []
+    ],
+    "rowAnimationModes": [
+      "cell",
+      "cell",
+      "cell"
+    ],
+    "rowSteps": [
+      1,
+      1,
+      1
+    ],
+    "stripSteps": [
+      1,
+      1,
+      1
+    ],
+    "rowCellGaps": [
+      4,
+      4,
+      4
+    ],
+    "rowOffsets": [
+      0,
+      2000,
+      4000
+    ]
+  },
+  "right": {
+    "tvId": "right",
+    "rows": 3,
+    "cols": 2,
+    "timelines": [
+      [],
+      [],
+      []
+    ],
+    "rowAnimationModes": [
+      "cell",
+      "cell",
+      "cell"
+    ],
+    "rowSteps": [
+      1,
+      1,
+      1
+    ],
+    "stripSteps": [
+      1,
+      1,
+      1
+    ],
+    "rowCellGaps": [
+      4,
+      4,
+      4
+    ],
+    "rowOffsets": [
+      0,
+      2000,
+      4000
+    ]
+  }
+}

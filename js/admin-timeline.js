@@ -1,5 +1,12 @@
-// PINEA Admin — Timeline Matrix Editor v3.3 (per-row settings)
+// PINEA Admin — Timeline Matrix Editor v4.1 (Server Backend)
 import { db } from './db.js';
+
+function getSlideUrl(s){
+  if(s.imageUrl) return s.imageUrl;
+  if(s.imageFilename) return '/api/images/'+s.imageFilename;
+  return '';
+}
+function hasImage(s){ return !!(s.imageUrl || s.imageFilename); }
 
 let allSlides=[], layoutData={rows:3,cols:2,timelines:[[],[],[]],rowAnimationModes:['cell','cell','cell'],rowSteps:[1,1,1],stripSteps:[1,1,1],cellGap:4,useMatrix:true};
 let dragSrc=null, currentTV='left';
@@ -80,13 +87,12 @@ function renderTVSelector() {
 /* POOL */
 function renderPool() {
   const pool=document.getElementById('slidePool'); if(!pool) { console.warn('[Timeline] slidePool nicht gefunden'); return; }
-  pool.querySelectorAll('img[data-blob]').forEach(img=>{ if(img.src?.startsWith('blob:')) URL.revokeObjectURL(img.src); });
+  pool.querySelectorAll('img[data-src]').forEach(img=>{ img.src=''; });
   console.log('[Timeline] renderPool() — allSlides:', allSlides.length, 'currentTV:', currentTV);
 
   const tvSlides=allSlides.filter(s=>{
-    const hasBlob = s.imageBlob instanceof Blob;
     const tvMatch = s.tvAssignment===currentTV || s.tvAssignment==='both';
-    return hasBlob && tvMatch;
+    return hasImage(s) && tvMatch;
   });
   console.log('[Timeline] renderPool() — tvSlides (gefiltert):', tvSlides.length);
 
@@ -102,9 +108,9 @@ function renderPool() {
     return;
   }
   pool.innerHTML=tvSlides.map(s=>{
-    const url=URL.createObjectURL(s.imageBlob);
+    const url=getSlideUrl(s);
     return `<div class="timeline-pool-item" draggable="true" data-slide-id="${s.id}" ondragstart="window.timelineDragStart(event,'${s.id}')">
-      <img src="${url}" alt="${s.name}" data-blob="1">
+      <img src="${url}" alt="${s.name}" data-src="1">
       <div class="pool-overlay">
         <div class="pool-dot" style="background:${s.groupColor||'#555'}"></div>
         <div class="pool-name">${s.name.substring(0,16)}</div>
@@ -163,9 +169,9 @@ function renderAllRows() {
 
 function renderSlot(rowIdx,slotIdx,slideId) {
   const slide=allSlides.find(s=>s.id===slideId); if(!slide) return `<div class="row-slot row-slot-empty" data-row="${rowIdx}" data-slot="${slotIdx}">?</div>`;
-  const url=URL.createObjectURL(slide.imageBlob);
+  const url=getSlideUrl(slide);
   return `<div class="row-slot assigned" draggable="true" data-row="${rowIdx}" data-slot="${slotIdx}" data-slide-id="${slideId}" ondragstart="window.slotDragStart(event,${slideId},${rowIdx},${slotIdx})" ondragover="window.slotDragOver(event)" ondrop="window.slotDrop(event,${rowIdx},${slotIdx})">
-    <img src="${url}" alt="${slide.name}" data-blob="1"><div class="slot-overlay"><div class="slot-dot" style="background:${slide.groupColor||'#555'}"></div><div class="slot-name">${slide.name.substring(0,12)}</div></div>
+    <img src="${url}" alt="${slide.name}" data-src="1"><div class="slot-overlay"><div class="slot-dot" style="background:${slide.groupColor||'#555'}"></div><div class="slot-name">${slide.name.substring(0,12)}</div></div>
     <button class="slot-del" onclick="window.removeFromRow(${rowIdx},${slotIdx})" title="Entfernen">×</button></div>`;
 }
 

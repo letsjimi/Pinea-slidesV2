@@ -1,9 +1,9 @@
-// PINEA TV Engine v3.11 — Per-Row Animation Settings
+// PINEA TV Engine v4.1 — Server Backend Ready
 import { db, initDB, DEFAULT_CONFIG } from './db.js';
 
 let config={}, transCfg={}, layout=null, tvSide=null;
 let rowTimers=[], idleTimer=null, ssTimer=null, ssCurrent=-1, ssActive='A';
-const blobCache=new Map();
+const urlCache=new Map();
 
 export async function initTV(tv) {
   tvSide=tv; await initDB();
@@ -57,7 +57,7 @@ function applyConfig() {
 }
 
 async function render() {
-  clearTimers(); clearBlobCache();
+  clearTimers();
   removeMatrix();
   const totalSlides=(layout.timelines||[]).flat().filter(Boolean).length;
   if(totalSlides===0){
@@ -281,7 +281,8 @@ function ssNext() {
     const incoming=ssActive==='A'?document.getElementById('slideB'):document.getElementById('slideA');
     const outgoing=ssActive==='A'?document.getElementById('slideA'):document.getElementById('slideB');
     if(!incoming||!outgoing) return;
-    const url=getCachedBlobUrl(s.id, s.imageBlob);
+    const url=getCachedUrl(s);
+    if(!url) return;
     incoming.style.backgroundImage=`url(${url})`;
     const label=document.getElementById('groupLabel');
     if(label && config.showGroupLabel && s.groupName){
@@ -362,7 +363,7 @@ function runSsTransition(incoming, outgoing){
 
 function applyTransition(img, newUrl, oldSrc, type, dur){
   const ease=transCfg.easing||'ease';
-  const cleanup=()=>{ if(oldSrc && oldSrc.startsWith('blob:') && oldSrc!==newUrl) URL.revokeObjectURL(oldSrc); };
+  const cleanup=()=>{}; // Server URLs, keine Revoke nötig
 
   switch(type){
     case 'fade':{
@@ -423,42 +424,29 @@ function applyTransition(img, newUrl, oldSrc, type, dur){
   }
 }
 
-/* BLOB CACHE */
+/* IMAGE URL RESOLVER (Server Backend v4.1) */
+const urlCache=new Map();
 async function loadSlideImage(slideId){
   if(!slideId) return null;
-  const cached=blobCache.get(slideId);
-  if(cached){ cached.lastUsed=Date.now(); return cached.url; }
+  const cached=urlCache.get(slideId);
+  if(cached) return cached;
   try{
     const s=await db.slides.get(slideId);
-    if(!s||!s.imageBlob) return null;
-    const url=URL.createObjectURL(s.imageBlob);
-    blobCache.set(slideId,{url,lastUsed:Date.now()});
+    if(!s) return null;
+    // Prioritize cached server URL, then resolve from filename
+    let url=s.imageUrl || null;
+    if(!url && s.imageFilename) url='/api/images/'+s.imageFilename;
+    if(url) urlCache.set(slideId,url);
     return url;
   }catch(e){ console.error('[TV] loadSlideImage Fehler:', slideId, e); return null; }
 }
-
-function preloadSlideImage(slideId){
-  if(blobCache.has(slideId)) return;
-  db.slides.get(slideId).then(s=>{
-    if(s?.imageBlob){
-      const url=URL.createObjectURL(s.imageBlob);
-      blobCache.set(slideId,{url,lastUsed:Date.now()});
-    }
-  }).catch(()=>{});
+function preloadSlideImage(slideId){ loadSlideImage(slideId).catch(()=>{}); }
+function getCachedUrl(slide){ 
+  if(slide.imageUrl) return slide.imageUrl; 
+  if(slide.imageFilename) return '/api/images/'+slide.imageFilename; 
+  return null; 
 }
-
-function getCachedBlobUrl(slideId,blob){
-  const cached=blobCache.get(slideId);
-  if(cached) return cached.url;
-  const url=URL.createObjectURL(blob);
-  blobCache.set(slideId,{url,lastUsed:Date.now()});
-  return url;
-}
-
-function clearBlobCache(){
-  blobCache.forEach(({url})=>{ try{ URL.revokeObjectURL(url); }catch{} });
-  blobCache.clear();
-}
+function clearUrlCache(){ urlCache.clear(); }
 
 /* UTILS */
 function clearTimers(){

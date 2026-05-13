@@ -1,5 +1,6 @@
-// PINEA Admin v3.0 — Tabs, Upload, Gruppen, Slides, Timeline, Settings
+// PINEA Admin v4.1 — Server Backend Tabs, Upload, Gruppen, Slides, Timeline, Settings
 import { db, initDB, DEFAULT_CONFIG } from './db.js';
+import * as api from './api.js';
 
 let groups = [], slides = [], selectedUploadGroup = null, draggedSlide = null;
 let dbReady = false, timelineLoaded = false, currentTransition = 'fade';
@@ -8,16 +9,38 @@ let serverURL = '';
 
 /* INIT */
 document.addEventListener('DOMContentLoaded', async () => {
-  detectServer(); setupTabs(); setupUpload(); renderIPLinks();
+  detectServer(); setupLogin();
+});
+
+function setupLogin(){
+  const overlay=document.getElementById('loginOverlay');
+  const form=document.getElementById('loginForm');
+  const err=document.getElementById('loginError');
+  if(!overlay||!form) return initApp();
+  if(api.isLoggedIn()){ overlay.style.display='none'; return initApp(); }
+  overlay.style.display='flex';
+  form.onsubmit=async(e)=>{
+    e.preventDefault(); err.style.display='none';
+    const u=document.getElementById('loginUser').value.trim();
+    const p=document.getElementById('loginPass').value;
+    try{
+      await api.login({username:u, password:p});
+      overlay.style.display='none';
+      initApp();
+    }catch(ex){ err.textContent='Login fehlgeschlagen: '+ex.message; err.style.display='block'; }
+  };
+}
+
+async function initApp(){
+  setupTabs(); setupUpload(); renderIPLinks();
   try {
-    await initDB(); dbReady = true;
+    await initDB(); dbReady=true;
     await loadGroups(); await loadSlides(); await loadConfig();
     setupFilters(); renderGroups(); renderSlides(); renderGroupPills();
-    // lazy timeline
-    import('./admin-timeline.js').then(m => { if(m.initTimelineEditor) m.initTimelineEditor(); timelineLoaded = true; }).catch(()=>{});
-    console.log('PINEA Admin v3.0 ready');
-  } catch(err) { toast('Fehler beim Starten: ' + err.message, 'error'); }
-});
+    import('./admin-timeline.js').then(m=>{ if(m.initTimelineEditor) m.initTimelineEditor(); timelineLoaded=true; }).catch(()=>{});
+    console.log('PINEA Admin v4.1 ready');
+  } catch(err) { toast('Fehler beim Starten: '+err.message,'error'); }
+}
 
 function detectServer() {
   const h = window.location.hostname;
@@ -83,7 +106,7 @@ window.toast = toast;
 
 /* GROUPS */
 async function loadGroups() { 
-  groups = await db.groups.orderBy('sortOrder').toArray();
+  groups = await db.groups.toArray().then(arr=>arr.sort((a,b)=>a.sortOrder-b.sortOrder));
   if(!selectedUploadGroup && groups.length) selectedUploadGroup = groups[0].id;
 }
 async function addGroup() {
@@ -98,7 +121,8 @@ async function addGroup() {
 }
 async function deleteGroup(id) {
   if(!confirm('Gruppe und alle Slides löschen?')) return;
-  await db.slides.where('groupId').equals(id).delete();
+  const allSlides = await db.slides.toArray();
+  for (const s of allSlides) { if (s.groupId === id) await db.slides.delete(s.id); }
   await db.groups.delete(id);
   await loadGroups(); await loadSlides();
   renderGroups(); renderGroupPills(); renderSlides(); updateFilterOptions();
@@ -132,6 +156,11 @@ function setupUpload() {
   zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('dragover'); dbReady?handleFiles(e.dataTransfer.files):toast('DB nicht bereit','error'); });
   input.addEventListener('change', e => { dbReady?handleFiles(e.target.files):toast('DB nicht bereit','error'); });
 }
+function getSlideUrl(s) {
+  if(s.imageUrl) return s.imageUrl;
+  if(s.imageFilename) return '/api/images/' + s.imageFilename;
+  return '';
+}
 async function handleFiles(files) {
   if(!selectedUploadGroup && groups.length){ selectedUploadGroup=groups[0].id; toast('Gruppe auto-gewählt','info'); }
   if(!selectedUploadGroup){ toast('Zuerst Gruppe anlegen','error'); return; }
@@ -142,14 +171,23 @@ async function handleFiles(files) {
   const maxS = slides.length? Math.max(...slides.map(s=>s.sortOrder)) : -1;
   const newSlides = [];
   for(let i=0;i<imgs.length;i++){
-    const blob = new Blob([await imgs[i].arrayBuffer()], {type:imgs[i].type});
-    newSlides.push({groupId:selectedUploadGroup, groupName:group.name, groupColor:group.color, tvAssignment:'both', imageBlob:blob, name:imgs[i].name, sortOrder:maxS+1+i, uploadedAt:Date.now()});
-    const p = zone.querySelector('p'); if(p) p.textContent = `⏳ ${i+1}/${imgs.length}...`;
+    const fd = new FormData(); fd.append('images', imgs[i]);
+    const p = zone.querySelector('p'); if(p) p.textContent = `⏳ Upload ${i+1}/${imgs.length}...`;
+    try {
+      const uploaded = await api.uploadImages(fd);
+      const fileInfo = uploaded.files?.[0];
+      if(!fileInfo) throw new Error('Upload failed');
+      newSlides.push({
+        groupId: selectedUploadGroup, groupName: group.name, groupColor: group.color,
+        tvAssignment: 'both', imageFilename: fileInfo.filename, imageUrl: fileInfo.url,
+        name: imgs[i].name, sortOrder: maxS+1+i, uploadedAt: Date.now()
+      });
+    } catch(err) { toast(`Upload Fehlgeschlagen: ${err.message}`, 'error'); }
   }
-  await db.slides.bulkAdd(newSlides);
+  if(newSlides.length) await db.slides.bulkAdd(newSlides);
   zone.classList.remove('uploading'); const p=zone.querySelector('p'); if(p) p.textContent='Dateien hier reinziehen oder klicken';
   await loadSlides(); renderSlides(); renderGroupPills();
-  toast(`${imgs.length} Bilder hochgeladen`,'success');
+  toast(`${newSlides.length} Bilder hochgeladen`,'success');
 }
 window.handleFiles = handleFiles;
 
@@ -175,15 +213,23 @@ async function generateTestImages() {
     ctx.font='36px "Segoe UI"'; ctx.fillStyle='rgba(255,255,255,.8)'; ctx.fillText(group.name,540,1100);
     ctx.strokeStyle='rgba(255,255,255,.3)'; ctx.lineWidth=8; ctx.strokeRect(40,40,1000,1840);
     const blob = await new Promise(r=>canvas.toBlob(r,'image/png'));
-    newSlides.push({groupId:selectedUploadGroup, groupName:group.name, groupColor:group.color, tvAssignment:'both', imageBlob:blob, name:`Test_${String(i+1).padStart(2,'0')}.png`, sortOrder:maxS+1+i, uploadedAt:Date.now()});
+    const file = new File([blob], `Test_${String(i+1).padStart(2,'0')}.png`, {type:'image/png'});
+    try {
+      const fd = new FormData(); fd.append('images', file);
+      const uploaded = await api.uploadImages(fd);
+      const info = uploaded.files?.[0];
+      if(!info) continue;
+      newSlides.push({groupId:selectedUploadGroup, groupName:group.name, groupColor:group.color, tvAssignment:'both', imageFilename:info.filename, imageUrl:info.url, name:file.name, sortOrder:maxS+1+i, uploadedAt:Date.now()});
+    } catch(err) { toast(`Testbild Upload Fehlgeschlagen: ${err.message}`, 'error'); }
   }
-  await db.slides.bulkAdd(newSlides); await loadSlides(); renderSlides();
-  toast(`${count} Testbilder generiert`,'success');
+  if(newSlides.length) await db.slides.bulkAdd(newSlides);
+  await loadSlides(); renderSlides();
+  toast(`${newSlides.length} Testbilder generiert`,'success');
 }
 window.generateTestImages = generateTestImages;
 
 /* SLIDES */
-async function loadSlides() { slides = await db.slides.orderBy('sortOrder').toArray(); }
+async function loadSlides() { slides = await db.slides.toArray().then(arr=>arr.sort((a,b)=>a.sortOrder-b.sortOrder)); }
 function renderSlides() {
   const grid = document.getElementById('slideGrid'); if(!grid) return;
   const fg = document.getElementById('filterGroup')?.value||'';
@@ -191,13 +237,12 @@ function renderSlides() {
   let filtered = slides;
   if(fg) filtered = filtered.filter(s=>String(s.groupId)===fg);
   if(ft) filtered = filtered.filter(s=>s.tvAssignment===ft || s.tvAssignment==='both');
-  grid.querySelectorAll('img[data-blob]').forEach(img=>{ if(img.src?.startsWith('blob:')) URL.revokeObjectURL(img.src); });
   if(!filtered.length){ grid.innerHTML=''; document.getElementById('slideEmptyHint').style.display='block'; return; }
   document.getElementById('slideEmptyHint').style.display='none';
   grid.innerHTML = filtered.map((s,idx)=>{
-    const url=URL.createObjectURL(s.imageBlob);
+    const url=getSlideUrl(s);
     return `<div class="thumb-item" draggable="true" data-id="${s.id}" data-idx="${idx}" ondragstart="window.slideDragStart(${s.id})" ondragover="event.preventDefault()" ondrop="window.slideDrop(event,${idx})" ondragend="window.slideDragEnd()">
-      <img src="${url}" alt="${s.name}" data-blob="1">
+      <img src="${url}" alt="${s.name}" loading="lazy">
       <div class="thumb-overlay"><span>${s.name.substring(0,20)}</span><span style="font-size:10px;opacity:.7">${s.tvAssignment} | ${s.groupName}</span></div>
       <div class="thumb-actions"><button onclick="window.deleteSlide(${s.id})" title="Löschen">🗑️</button><button onclick="window.cycleTV(${s.id})" title="TV">📺</button></div>
     </div>`;
@@ -296,9 +341,11 @@ async function saveTransitionConfig() {
   if(currentTransition==='zoom') cfg.transitionSettings.zoomScale = parseFloat(document.getElementById('transZoomScale')?.value) || 1.5;
   if(currentTransition==='flip') cfg.transitionSettings.flipAxis = document.getElementById('transFlipAxis')?.value || 'X';
   if(currentTransition==='wipe') cfg.transitionSettings.wipeDirection = document.getElementById('transWipeDir')?.value || 'left';
-  await db.config.update('global', cfg);
+  await db.config.put(cfg);
   toast('Übergang gespeichert','success');
 }
+
+window.pineaLogout=function(){ api.logout(); window.location.reload(); };
 window.saveTransitionConfig = saveTransitionConfig;
 
 window.refreshPreview = function(side) {
