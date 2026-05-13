@@ -35,7 +35,7 @@ function applyConfig() {
       // Nach 90°-Rotation tauschen sich Breite/Höhe:
       // Container-Breite (wird zur Viewport-Höhe) = vh
       // Container-Höhe  (wird zur Viewport-Breite) = vw
-      container.style.cssText=`position:fixed;left:50%;top:50%;width:100vw;height:100vh;transform:translate(-50%,-50%) rotate(${rot}deg);transform-origin:center center;`;
+      container.style.cssText=`position:fixed;left:50%;top:50%;width:${vh}px;height:${vw}px;transform:translate(-50%,-50%) rotate(${rot}deg);transform-origin:center center;`;
       document.body.classList.add('tv-rotated');
     }else{
       container.style.cssText='';
@@ -126,7 +126,10 @@ function renderMatrix() {
         const slideId=displayIds[i];
         const cell=document.createElement('div');
         cell.className='tv-strip-cell';
-        cell.style.cssText=`width:calc(100vw/${cols});height:100%;flex-shrink:0;position:relative;overflow:hidden;`;
+        // Breite basiert auf rowWrapper (100% Container), nicht strip
+        const isLastInBlock=(i+1)%cols===0;
+        const gapStyle=isLastInBlock?'':`margin-right:${rowGap}px;`;
+        cell.style.cssText=`width:calc(100%/${cols});height:100%;flex-shrink:0;position:relative;overflow:hidden;${gapStyle}`;
         const img=document.createElement('img');
         img.alt=''; img.loading='eager';
         img.style.cssText='width:100%;height:100%;object-fit:var(--crop-mode,cover);display:block;';
@@ -214,23 +217,22 @@ function startStripAnim(stripEl, slideIds, cols, step, delay=0){
   if(!total) return;
 
   let offset=0;
-  const blockWidth=stripEl.parentElement?.clientWidth||stripEl.clientWidth;
-  const cellWidth=blockWidth/cols; // Eine Zellenbreite = Viewport / cols
+  const cellWidthPct=100/cols;
 
   const tick=()=>{
     const rawNext=offset+step;
     const nextOffset=rawNext%total;
     const isWrapping=rawNext>=total;
 
-    const targetX=-rawNext*cellWidth;
+    const targetX=-rawNext*cellWidthPct;
 
     stripEl.style.transition=`transform ${dur}ms ${transCfg.easing||'ease-in-out'}`;
-    stripEl.style.transform=`translateX(${targetX}px)`;
+    stripEl.style.transform=`translateX(${targetX}%)`;
 
     if(isWrapping){
       setTimeout(()=>{
         stripEl.style.transition='none';
-        stripEl.style.transform=`translateX(${-nextOffset*cellWidth}px)`;
+        stripEl.style.transform=`translateX(${-nextOffset*cellWidthPct}%)`;
         requestAnimationFrame(()=>{ stripEl.style.transition=''; });
       }, dur);
     }
