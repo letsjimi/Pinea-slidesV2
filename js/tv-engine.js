@@ -1,4 +1,4 @@
-// PINEA TV Engine v3.8 — Matrix + Slideshow mit automatischer Animation
+// PINEA TV Engine v3.11 — Per-Row Animation Settings
 import { db, initDB, DEFAULT_CONFIG } from './db.js';
 
 let config={}, transCfg={}, layout=null, tvSide=null;
@@ -9,7 +9,12 @@ export async function initTV(tv) {
   tvSide=tv; await initDB();
   config=await db.config.get('global') || DEFAULT_CONFIG;
   transCfg=config.transitionSettings || {duration:1200, easing:'ease-in-out'};
-  layout=await db.layouts.get(tvSide) || {rows:3, cols:2, timelines:[[],[],[]], step:1, cellGap:4, useMatrix:true, rowOffsets:[0,2000,4000]};
+  layout=await db.layouts.get(tvSide) || {
+    rows:3, cols:2, timelines:[[],[],[]],
+    rowAnimationModes:['cell','cell','cell'],
+    rowSteps:[1,1,1], stripSteps:[1,1,1],
+    cellGap:4, useMatrix:true, rowOffsets:[0,2000,4000]
+  };
   applyConfig(); await render();
   if(config.idleTimeout>0) setupIdle();
   window.addEventListener('keydown', e=>{ if(e.key==='d' && e.ctrlKey){ e.preventDefault(); toggleDebug(); }});
@@ -21,7 +26,6 @@ function applyConfig() {
   document.documentElement.style.setProperty('--grid-color', config.gridColor||'#ff3366');
   document.documentElement.style.setProperty('--grid-opacity', config.gridOpacity||0.4);
   document.documentElement.style.setProperty('--grid-width', (config.gridWidthPx||1)+'px');
-  // TV-Rotation
   const container=document.getElementById('tvContainer');
   if(container && layout.rotation){
     const rot=layout.rotation;
@@ -79,26 +83,33 @@ function showScreensaver(show){
 /* MATRIX */
 function renderMatrix() {
   const rows=layout.rows||3, cols=layout.cols||2;
-  const timelines=layout.timelines||[], step=layout.step||1, gap=layout.cellGap||0;
-  const isStrip=layout.rowAnimationMode==='strip';
+  const timelines=layout.timelines||[], gap=layout.cellGap||0;
   const container=document.getElementById('tvContainer');
   if(!container) return console.error('[TV] tvContainer nicht gefunden');
 
   const matrix=document.createElement('div');
   matrix.className='tv-matrix';
+  const isMixedModes=(layout.rowAnimationModes||[]).some((m,i,a)=>m!==a[0]);
 
-  if(isStrip){
+  if(isMixedModes){
     matrix.style.cssText=`display:flex;flex-direction:column;gap:${gap}px;position:absolute;inset:0;z-index:1;`;
   }else{
-    matrix.style.cssText=`display:grid;grid-template-rows:repeat(${rows},1fr);grid-template-columns:repeat(${cols},1fr);gap:${gap}px;position:absolute;inset:0;z-index:1;`;
+    const firstMode=(layout.rowAnimationModes?.[0])||'cell';
+    if(firstMode==='strip'){
+      matrix.style.cssText=`display:flex;flex-direction:column;gap:${gap}px;position:absolute;inset:0;z-index:1;`;
+    }else{
+      matrix.style.cssText=`display:grid;grid-template-rows:repeat(${rows},1fr);grid-template-columns:repeat(${cols},1fr);gap:${gap}px;position:absolute;inset:0;z-index:1;`;
+    }
   }
 
   for(let r=0;r<rows;r++){
     const ids=timelines[r]||[];
     const hasImages=ids.length>0;
+    const mode=(layout.rowAnimationModes?.[r])||'cell';
+    const isStrip=mode==='strip';
+    const step=(isStrip?(layout.stripSteps?.[r]):(layout.rowSteps?.[r]))||1;
 
     if(isStrip){
-      // Strip-Modus: jede Zeile ist ein overflow:hidden Container mit horizontalem Streifen
       const rowWrapper=document.createElement('div');
       rowWrapper.className='tv-row';
       rowWrapper.style.cssText=`flex:1;overflow:hidden;position:relative;background:#000;`;
@@ -107,7 +118,6 @@ function renderMatrix() {
       strip.className='tv-strip';
       strip.dataset.row=r;
       strip.style.cssText=`display:flex;height:100%;`;
-      // Dupliziere Timeline 3x für nahtlosen Ringpuffer-Loop
       const displayIds=[...ids,...ids,...ids];
 
       for(let i=0;i<displayIds.length;i++){
@@ -118,9 +128,7 @@ function renderMatrix() {
         const img=document.createElement('img');
         img.alt=''; img.loading='eager';
         img.style.cssText='width:100%;height:100%;object-fit:var(--crop-mode,cover);display:block;';
-        loadSlideImage(slideId).then(url=>{
-          if(url){ img.src=url; }
-        }).catch(()=>{});
+        loadSlideImage(slideId).then(url=>{ if(url){ img.src=url; } }).catch(()=>{});
         cell.appendChild(img); strip.appendChild(cell);
       }
 
@@ -132,7 +140,6 @@ function renderMatrix() {
         startStripAnim(strip, ids, cols, step, delay);
       }
     }else{
-      // Cell-Modus: Grid-Zellen
       for(let c=0;c<cols;c++){
         const cell=document.createElement('div');
         cell.className='tv-cell';
@@ -159,7 +166,7 @@ function renderMatrix() {
   container.appendChild(matrix);
 }
 
-/* CELL ANIMATION — Zellen-Modus: jede Zelle wechselt individuell (Stagger) */
+/* CELL ANIMATION */
 function startCellAnim(rowIdx, slideIds, cols, step, delay=0){
   const speed=config.slideshowSpeed||5000;
   const dur=transCfg.duration||1200;
@@ -168,7 +175,6 @@ function startCellAnim(rowIdx, slideIds, cols, step, delay=0){
 
   const tick=async()=>{
     if(!slideIds.length) return;
-    // Voller Ringpuffer: offset läuft modulo slideIds.length
     offset=(offset+step)%slideIds.length;
     const matrix=document.querySelector('.tv-matrix'); if(!matrix) return;
     const allCells=matrix.querySelectorAll('.tv-cell');
@@ -193,7 +199,7 @@ function startCellAnim(rowIdx, slideIds, cols, step, delay=0){
   rowTimers.push(initial);
 }
 
-/* STRIP ANIMATION — Streifen-Modus: ganze Zeile scrollt horizontal */
+/* STRIP ANIMATION */
 function startStripAnim(stripEl, slideIds, cols, step, delay=0){
   const speed=config.slideshowSpeed||5000;
   const dur=transCfg.duration||1200;
@@ -207,7 +213,6 @@ function startStripAnim(stripEl, slideIds, cols, step, delay=0){
     const rawNext=offset+step;
     const nextOffset=rawNext%total;
     const isWrapping=rawNext>=total;
-
     const targetX=-rawNext*cellWidthPct;
 
     stripEl.style.transition=`transform ${dur}ms ${transCfg.easing||'ease-in-out'}`;
@@ -217,9 +222,7 @@ function startStripAnim(stripEl, slideIds, cols, step, delay=0){
       setTimeout(()=>{
         stripEl.style.transition='none';
         stripEl.style.transform=`translateX(${-nextOffset*cellWidthPct}%)`;
-        requestAnimationFrame(()=>{
-          stripEl.style.transition='';
-        });
+        requestAnimationFrame(()=>{ stripEl.style.transition=''; });
       }, dur);
     }
 
@@ -244,7 +247,7 @@ function renderSlideshow() {
       const all=await db.slides.where('tvAssignment').anyOf(tvSide,'both').sortBy('sortOrder');
       if(all.length>0){
         showScreensaver(false);
-        ssNext(); 
+        ssNext();
         ssTimer=setInterval(ssNext, config.slideshowSpeed||5000);
       } else {
         showScreensaver(true);

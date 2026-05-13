@@ -16,6 +16,47 @@ db.version(2).stores({
         if (!s.tvAssignment) s.tvAssignment = 'both';
     });
 });
+db.version(3).stores({
+    groups:   'id++, name, sortOrder',
+    slides:   'id++, groupId, sortOrder, tvAssignment',
+    config:   'id',
+    layouts:  'tvId'
+}).upgrade(async tx => {
+    await tx.table('layouts').toCollection().modify(layout => {
+        const rows = layout.rows || 3;
+        const oldMode = layout.rowAnimationMode || 'cell';
+        const oldStep = layout.step || 1;
+        
+        // Migrate single values → per-row arrays
+        if (!layout.rowAnimationModes || !Array.isArray(layout.rowAnimationModes)) {
+            layout.rowAnimationModes = Array.from({length: rows}, () => oldMode);
+        }
+        if (!layout.rowSteps || !Array.isArray(layout.rowSteps)) {
+            layout.rowSteps = Array.from({length: rows}, () => oldStep);
+        }
+        if (!layout.stripSteps || !Array.isArray(layout.stripSteps)) {
+            layout.stripSteps = Array.from({length: rows}, () => 1);
+        }
+        if (!layout.rowOffsets || !Array.isArray(layout.rowOffsets)) {
+            layout.rowOffsets = Array.from({length: rows}, (_, i) => i * 2000);
+        }
+        
+        // Ensure arrays match current row count
+        while (layout.rowAnimationModes.length < rows) layout.rowAnimationModes.push(oldMode);
+        while (layout.rowSteps.length < rows) layout.rowSteps.push(oldStep);
+        while (layout.stripSteps.length < rows) layout.stripSteps.push(1);
+        while (layout.rowOffsets.length < rows) layout.rowOffsets.push((layout.rowOffsets.length || 0) * 2000);
+        
+        layout.rowAnimationModes.length = rows;
+        layout.rowSteps.length = rows;
+        layout.stripSteps.length = rows;
+        layout.rowOffsets.length = rows;
+        
+        // Cleanup old flat fields (optional, keep for backward compat)
+        // delete layout.rowAnimationMode;
+        // delete layout.step;
+    });
+});
 
 const DEFAULT_CONFIG = {
     id:              'global',
@@ -56,7 +97,10 @@ async function initDB() {
                 tvId: tv,
                 rows: 3, cols: 2,
                 timelines: [[], [], []],
-                step: 1, cellGap: 4, useMatrix: true,
+                rowAnimationModes: ['cell', 'cell', 'cell'],
+                rowSteps: [1, 1, 1],
+                stripSteps: [1, 1, 1],
+                cellGap: 4, useMatrix: true,
                 rowOffsets: [0, 2000, 4000],
             });
         }

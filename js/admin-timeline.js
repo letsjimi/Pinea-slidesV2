@@ -1,7 +1,7 @@
-// PINEA Admin — Timeline Matrix Editor v3.2
+// PINEA Admin — Timeline Matrix Editor v3.3 (per-row settings)
 import { db } from './db.js';
 
-let allSlides=[], layoutData={rows:3,cols:2,timelines:[[],[],[]],step:1,cellGap:4,useMatrix:true};
+let allSlides=[], layoutData={rows:3,cols:2,timelines:[[],[],[]],rowAnimationModes:['cell','cell','cell'],rowSteps:[1,1,1],stripSteps:[1,1,1],cellGap:4,useMatrix:true};
 let dragSrc=null, currentTV='left';
 
 export async function initTimelineEditor() {
@@ -24,13 +24,40 @@ async function refreshTimelineData() {
     const saved = await db.layouts.get(currentTV);
     if(saved) {
       layoutData=saved;
+      const rows=layoutData.rows||3;
+      // Ensure arrays exist and match row count
+      if(!layoutData.rowAnimationModes||!Array.isArray(layoutData.rowAnimationModes)){
+        const oldMode=layoutData.rowAnimationMode||'cell';
+        layoutData.rowAnimationModes=Array.from({length:rows},()=>oldMode);
+      }
+      if(!layoutData.rowSteps||!Array.isArray(layoutData.rowSteps)){
+        const oldStep=layoutData.step||1;
+        layoutData.rowSteps=Array.from({length:rows},()=>oldStep);
+      }
+      if(!layoutData.stripSteps||!Array.isArray(layoutData.stripSteps)){
+        layoutData.stripSteps=Array.from({length:rows},()=>1);
+      }
+      if(!layoutData.rowOffsets||!Array.isArray(layoutData.rowOffsets)){
+        layoutData.rowOffsets=Array.from({length:rows},(_,i)=>i*2000);
+      }
+      // Resize arrays to match current row count
+      while(layoutData.rowAnimationModes.length<rows) layoutData.rowAnimationModes.push(layoutData.rowAnimationModes[0]||'cell');
+      while(layoutData.rowSteps.length<rows) layoutData.rowSteps.push(layoutData.rowSteps[0]||1);
+      while(layoutData.stripSteps.length<rows) layoutData.stripSteps.push(1);
+      while(layoutData.rowOffsets.length<rows) layoutData.rowOffsets.push((layoutData.rowOffsets.length||0)*2000);
+      layoutData.rowAnimationModes.length=rows;
+      layoutData.rowSteps.length=rows;
+      layoutData.stripSteps.length=rows;
+      layoutData.rowOffsets.length=rows;
+      // Resize timelines
+      const oldT=layoutData.timelines||[];
+      const newT=Array.from({length:rows},(_,ri)=>ri<oldT.length&&oldT[ri]?[...oldT[ri]]:[]);
+      layoutData.timelines=newT;
       const rotEl=document.getElementById('tvRotation');
-      const animEl=document.getElementById('rowAnimationMode');
       if(rotEl) rotEl.value=layoutData.rotation||'0';
-      if(animEl) animEl.value=layoutData.rowAnimationMode||'cell';
       console.log('[Timeline] Layout geladen für', currentTV, ':', layoutData);
     } else {
-      layoutData={tvId:currentTV,rows:3,cols:2,timelines:[[],[],[]],step:1,cellGap:4,useMatrix:true};
+      layoutData={tvId:currentTV,rows:3,cols:2,timelines:[[],[],[]],rowAnimationModes:['cell','cell','cell'],rowSteps:[1,1,1],stripSteps:[1,1,1],cellGap:4,useMatrix:true,rowOffsets:[0,2000,4000]};
       await db.layouts.put(layoutData);
       console.log('[Timeline] Default-Layout erstellt für', currentTV);
     }
@@ -93,17 +120,33 @@ window.timelineDragStart=function(e,slideId){
 /* ROWS */
 function renderAllRows() {
   const c=document.getElementById('timelineRows'); if(!c) { console.warn('[Timeline] timelineRows nicht gefunden'); return; }
-  const {rows,timelines}=layoutData;
+  const {rows,timelines,rowAnimationModes,rowSteps,stripSteps}=layoutData;
   console.log('[Timeline] renderAllRows() — rows:', rows, 'timelines:', timelines);
   if(!rows){ c.innerHTML=`<div style="text-align:center;padding:30px;color:#555;">Reihen > 0 einstellen.</div>`; return; }
   c.innerHTML=Array.from({length:rows},(_,ri)=>{
     const ids=timelines[ri]||[]; const has=ids.length>0;
     const fill=Math.min(100,(ids.length/(layoutData.cols||2))*100);
+    const mode=(rowAnimationModes?.[ri])||'cell';
+    const step=(mode==='strip'?(stripSteps?.[ri]):(rowSteps?.[ri]))||1;
     return `<div class="timeline-row ${has?'has-content':'empty'}">
       <div class="row-header"><div class="row-info"><span class="row-num">Zeile ${ri+1}</span><span class="row-count">${ids.length} Bilder</span></div>
       <div class="row-fill-bar"><div class="row-fill-track"><div class="row-fill-progress" style="width:${fill}%"></div></div>
       ${has?`<button class="btn btn-ghost" onclick="window.scrollRow(${ri},-1)">◀</button><button class="btn btn-ghost" onclick="window.scrollRow(${ri},1)">▶</button>`:''}
       <button class="btn btn-ghost" onclick="window.clearRow(${ri})" title="Leeren">🗑️</button></div></div>
+      <div class="row-controls" style="display:flex;gap:12px;flex-wrap:wrap;padding:8px 12px;background:#14141a;border-radius:8px;margin-bottom:8px;align-items:center;">
+        <div class="form-row" style="margin:0;"><label>Modus:</label>
+          <select onchange="window.updateRowMode(${ri},this.value)" style="width:140px;">
+            <option value="cell" ${mode==='cell'?'selected':''}>Zellen-Wechsel</option>
+            <option value="strip" ${mode==='strip'?'selected':''}>Scroll-Streifen</option>
+          </select>
+        </div>
+        <div class="form-row" style="margin:0;"><label>${mode==='strip'?'Strip-Schritt':'Zellen-Schritt'}:</label>
+          <input type="number" value="${step}" min="1" max="10" style="width:70px;" onchange="window.updateRowStep(${ri},this.value)">
+        </div>
+        <div class="form-row" style="margin:0;"><label>Stagger (ms):</label>
+          <input type="number" value="${(layoutData.rowOffsets?.[ri]||0)}" min="0" max="20000" step="500" style="width:90px;" onchange="window.updateRowOffset(${ri},this.value)">
+        </div>
+      </div>
       <div class="row-strip ${has?'':'row-strip-empty'}" data-row="${ri}" ondragover="window.rowDragOver(event)" ondragleave="window.rowDragLeave(event)" ondrop="window.rowDrop(event,${ri})">
         ${!has?`<div class="row-empty-hint">⬇️ Bilder aus dem Pool hier reinziehen</div>`:ids.map((sid,si)=>renderSlot(ri,si,sid)).join('')}
       </div></div>`;
@@ -118,6 +161,40 @@ function renderSlot(rowIdx,slotIdx,slideId) {
     <img src="${url}" alt="${slide.name}" data-blob="1"><div class="slot-overlay"><div class="slot-dot" style="background:${slide.groupColor||'#555'}"></div><div class="slot-name">${slide.name.substring(0,12)}</div></div>
     <button class="slot-del" onclick="window.removeFromRow(${rowIdx},${slotIdx})" title="Entfernen">×</button></div>`;
 }
+
+/* ROW-LEVEL UPDATES */
+window.updateRowMode=async function(ri,newMode){
+  const modes=[...(layoutData.rowAnimationModes||[])];
+  while(modes.length<(layoutData.rows||3)) modes.push('cell');
+  modes[ri]=newMode;
+  layoutData.rowAnimationModes=modes;
+  await db.layouts.put(layoutData); renderAllRows(); toast(`Zeile ${ri+1}: ${newMode==='strip'?'Strip':'Cell'}-Modus`,'success');
+};
+
+window.updateRowStep=async function(ri,newVal){
+  const val=parseInt(newVal)||1;
+  const mode=(layoutData.rowAnimationModes?.[ri])||'cell';
+  if(mode==='strip'){
+    const steps=[...(layoutData.stripSteps||[])];
+    while(steps.length<(layoutData.rows||3)) steps.push(1);
+    steps[ri]=val;
+    layoutData.stripSteps=steps;
+  }else{
+    const steps=[...(layoutData.rowSteps||[])];
+    while(steps.length<(layoutData.rows||3)) steps.push(1);
+    steps[ri]=val;
+    layoutData.rowSteps=steps;
+  }
+  await db.layouts.put(layoutData); toast(`Zeile ${ri+1}: Schritt = ${val}`,'success');
+};
+
+window.updateRowOffset=async function(ri,newVal){
+  const offsets=[...(layoutData.rowOffsets||[])];
+  while(offsets.length<(layoutData.rows||3)) offsets.push(offsets.length*2000);
+  offsets[ri]=parseInt(newVal)||0;
+  layoutData.rowOffsets=offsets;
+  await db.layouts.put(layoutData); toast(`Zeile ${ri+1}: Offset = ${newVal}ms`,'success');
+};
 
 /* DRAG & DROP */
 window.rowDragOver=function(e){ e.preventDefault(); e.currentTarget.classList.add('dragover'); e.dataTransfer.dropEffect=dragSrc?.type==='slot'?'move':'copy'; };
@@ -164,14 +241,21 @@ window.scrollRow=function(rowIdx,dir){ const s=document.querySelector(`.timeline
 window.updateMatrixFromSettings=async function(){
   const r=parseInt(document.getElementById('matrixRows')?.value)||3;
   const c=parseInt(document.getElementById('matrixCols')?.value)||2;
-  const step=parseInt(document.getElementById('matrixStep')?.value)||1;
   const gap=parseInt(document.getElementById('cellGap')?.value)||4;
-  const stagger=parseInt(document.getElementById('rowStagger')?.value)||0;
   const rotation=parseInt(document.getElementById('tvRotation')?.value)||0;
-  const rowAnim=document.getElementById('rowAnimationMode')?.value||'cell';
-  const oldR=layoutData.rows||3, oldT=layoutData.timelines||[];
+  const oldR=layoutData.rows||3;
+  const oldT=layoutData.timelines||[];
   const newT=Array.from({length:r},(_,ri)=> ri<oldR && oldT[ri]?[...oldT[ri]]:[] );
-  const offsets=Array.from({length:r},(_,i)=>i*stagger);
-  layoutData={...layoutData,rows:r,cols:c,step,cellGap:gap,timelines:newT,rowOffsets:offsets,rotation,rowAnimationMode:rowAnim};
+  // Resize per-row arrays
+  const modes=[...(layoutData.rowAnimationModes||[])];
+  const rowSteps=[...(layoutData.rowSteps||[])];
+  const stripSteps=[...(layoutData.stripSteps||[])];
+  const offsets=[...(layoutData.rowOffsets||[])];
+  while(modes.length<r) modes.push(modes[0]||'cell');
+  while(rowSteps.length<r) rowSteps.push(rowSteps[0]||1);
+  while(stripSteps.length<r) stripSteps.push(1);
+  while(offsets.length<r) offsets.push(offsets.length*2000);
+  modes.length=r; rowSteps.length=r; stripSteps.length=r; offsets.length=r;
+  layoutData={...layoutData,rows:r,cols:c,cellGap:gap,timelines:newT,rowAnimationModes:modes,rowSteps,stripSteps,rowOffsets:offsets,rotation};
   await db.layouts.put(layoutData); renderAllRows(); toast('Layout aktualisiert','success');
 };

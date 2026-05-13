@@ -9,7 +9,7 @@
 <body class="admin-body">
 
 <header class="topbar">
-  <h1>🖼️ PINEA Slides <span style="font-weight:400;color:#ff3366">v3.10.3</span></h1>
+  <h1>🖼️ PINEA Slides <span style="font-weight:400;color:#ff3366">v3.11.0</span></h1>
   <span class="spacer"></span>
   <span id="ipBadge" style="font-size:13px;color:#888;background:#14141a;padding:6px 14px;border-radius:8px;border:1px solid #2a2a30;">📡 localhost:3000</span>
   <button class="btn btn-primary" onclick="startSlideshow()">▶ Start</button>
@@ -86,20 +86,12 @@
       <div id="timelineControls" style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:20px;">
         <div class="form-row" style="margin:0;"><label>Reihen:</label><input type="number" id="matrixRows" value="3" min="1" max="8" style="width:80px;"></div>
         <div class="form-row" style="margin:0;"><label>Spalten:</label><input type="number" id="matrixCols" value="2" min="1" max="8" style="width:80px;"></div>
-        <div class="form-row" style="margin:0;"><label>Schritt:</label><input type="number" id="matrixStep" value="1" min="1" max="10" style="width:80px;"></div>
         <div class="form-row" style="margin:0;"><label>Lücke (px):</label><input type="number" id="cellGap" value="4" min="0" max="50" style="width:80px;"></div>
-        <div class="form-row" style="margin:0;"><label>Stagger (ms):</label><input type="number" id="rowStagger" value="2000" min="0" max="20000" step="500" style="width:100px;"></div>
         <div class="form-row" style="margin:0;"><label>TV-Rotation:</label>
           <select id="tvRotation">
             <option value="0">0° (Normal)</option>
             <option value="-90">-90° (Links)</option>
             <option value="90">+90° (Rechts)</option>
-          </select>
-        </div>
-        <div class="form-row" style="margin:0;"><label>Zeilen-Animation:</label>
-          <select id="rowAnimationMode">
-            <option value="cell">Zellen-Wechsel</option>
-            <option value="strip">Scroll-Streifen (ganze Zeile)</option>
           </select>
         </div>
         <button class="btn btn-primary" onclick="updateMatrixFromSettings()">Anwenden</button>
