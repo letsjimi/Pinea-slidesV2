@@ -42,7 +42,7 @@ function initData(){
     {id:3,name:'Specials',color:'#00ff88',sortOrder:2}
   ]);
   if(!fs.existsSync(AUTH_FILE)){
-    saveJSON(AUTH_FILE, {users:[{username:'admin', password:bcrypt.hashSync('pinea2024',10)}]});
+    saveJSON(AUTH_FILE, {users:[{username:'HannaM', password:bcrypt.hashSync('PineaSlides_V4.1!',10)}]});
   }
 }
 initData();

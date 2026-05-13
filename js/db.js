@@ -18,6 +18,7 @@ function table(name){
         if(name==='groups') return t.toArray().then(arr => arr.find(x=>x.id===id||String(x.id)===String(id)) || undefined);
         if(name==='slides') return api.getSlide(id).then(r => r.slide || r).catch(()=>undefined);
         if(name==='layouts') return api.getLayout(id).then(r => r.layout || r).catch(()=>undefined);
+        if(name==='config') return api.getConfig().then(r => r.config || r).catch(()=>undefined);
         return Promise.resolve(undefined);
     };
     t.put = (obj) => {
@@ -31,6 +32,15 @@ function table(name){
         if(name==='groups') return api.createGroup(obj).then(r=>r.id);
         if(name==='slides') return api.createSlide(obj).then(r=>r.id);
         return Promise.resolve(obj.id);
+    };
+    t.bulkAdd = (arr) => {
+        return api.bulkSlides({slides: arr}).then(r=>r.count);
+    };
+    t.update = (id, changes) => {
+        if(name==='slides') return api.getSlide(id).then(r=>{ const s=r.slide||r; return api.updateSlide(id,{...s,...changes}); }).catch(()=>undefined);
+        if(name==='groups') return t.get(id).then(g=>g?api.updateGroup(id,{...g,...changes}):undefined);
+        if(name==='config') return api.putConfig({id:'global', ...changes}).then(r=>r.id||'global');
+        return Promise.resolve(id);
     };
     t.delete = (id) => {
         if(name==='groups') return api.deleteGroup(id).then(()=>id);
@@ -60,14 +70,12 @@ export const DEFAULT_CONFIG = {
 };
 
 export async function initGroupsIfEmpty(){
-    const groups = await db.groups.toArray();
-    if(!groups || groups.length===0){
-        for(const g of [
-            {id:1,name:'Allgemein',color:'#00aaff',sortOrder:0},
-            {id:2,name:'Programm',color:'#ffaa00',sortOrder:1},
-            {id:3,name:'Specials',color:'#00ff88',sortOrder:2}
-        ]){
-            await db.groups.put(g);
-        }
+    for(const g of [
+        {id:1,name:'Allgemein',color:'#00aaff',sortOrder:0},
+        {id:2,name:'Programm',color:'#ffaa00',sortOrder:1},
+        {id:3,name:'Specials',color:'#00ff88',sortOrder:2}
+    ]){
+        const existing = await db.groups.get(g.id);
+        if(!existing) await db.groups.add(g);
     }
 }
