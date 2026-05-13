@@ -155,7 +155,12 @@ function renderMatrix() {
         if(hasImages){
           const slideId=ids[c%ids.length];
           loadSlideImage(slideId).then(url=>{
-            if(url){ img.src=url; img.onload=()=>img.style.opacity='1'; }
+            if(url){
+              img.src=url;
+              const show=()=>img.style.opacity='1';
+              img.onload=show; img.onerror=show;
+              if(img.complete) show();
+            }
           }).catch(()=>{});
         }
         cell.appendChild(img); matrix.appendChild(cell);
@@ -365,7 +370,9 @@ function applyTransition(img, newUrl, oldSrc, type, dur){
       setTimeout(()=>{
         cleanup();
         img.src=newUrl;
-        img.onload=()=>img.style.opacity='1';
+        const fadeIn=()=>img.style.opacity='1';
+        img.onload=fadeIn; img.onerror=fadeIn;
+        if(img.complete) fadeIn();
       }, dur*0.5);
       break;
     }
