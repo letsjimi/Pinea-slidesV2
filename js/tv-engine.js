@@ -119,16 +119,17 @@ function renderMatrix() {
       const strip=document.createElement('div');
       strip.className='tv-strip';
       strip.dataset.row=r;
-      const totalGap=(cols-1)*rowGap;
-      strip.style.cssText=`display:flex;height:100%;gap:${rowGap}px;`;
+      strip.style.cssText=`display:flex;height:100%;`;
       const displayIds=[...ids,...ids,...ids];
 
       for(let i=0;i<displayIds.length;i++){
         const slideId=displayIds[i];
         const cell=document.createElement('div');
         cell.className='tv-strip-cell';
-        // Korrekte Breite: (Container - TotalGap) / cols, damit mit CSS gap alles passt
-        cell.style.cssText=`width:calc((100% - ${totalGap}px)/${cols});height:100%;flex-shrink:0;position:relative;overflow:hidden;`;
+        // Balken als padding-right — Hintergrund des rowWrapper ist schwarz, also sichtbar
+        const isLastInBlock=(i+1)%cols===0;
+        const padRight=isLastInBlock?0:rowGap;
+        cell.style.cssText=`width:calc(100%/${cols});height:100%;flex-shrink:0;position:relative;overflow:hidden;padding-right:${padRight}px;box-sizing:border-box;`;
         const img=document.createElement('img');
         img.alt=''; img.loading='eager';
         img.style.cssText='width:100%;height:100%;object-fit:var(--crop-mode,cover);display:block;';
@@ -222,13 +223,9 @@ function startStripAnim(stripEl, slideIds, cols, step, delay=0, gap=0){
     const nextOffset=rawNext%total;
     const isWrapping=rawNext>=total;
 
-    // Pixelgenaue Verschiebung: eine "cols-Gruppe" = Breite einer Zeile im DOM (inkl. Gaps)
-    // Wir nutzen die Breite des Parent (rowWrapper), da strip die Breite des Inhalts hat
     const blockWidth=stripEl.parentElement?.clientWidth||stripEl.clientWidth;
-    const totalGapInBlock=(cols-1)*gap;
-    const cellPlusGap=(blockWidth+totalGapInBlock)/cols; // Breite einer Zelle inkl. ihres Gap-Anteils
-
-    const targetX=-rawNext*cellPlusGap;
+    const cellWidth=blockWidth/cols; // Eine Zelle = Viewport / cols (inkl. Padding/Balken)
+    const targetX=-rawNext*cellWidth;
 
     stripEl.style.transition=`transform ${dur}ms ${transCfg.easing||'ease-in-out'}`;
     stripEl.style.transform=`translateX(${targetX}px)`;
@@ -236,7 +233,7 @@ function startStripAnim(stripEl, slideIds, cols, step, delay=0, gap=0){
     if(isWrapping){
       setTimeout(()=>{
         stripEl.style.transition='none';
-        stripEl.style.transform=`translateX(${-nextOffset*cellPlusGap}px)`;
+        stripEl.style.transform=`translateX(${-nextOffset*cellWidth}px)`;
         requestAnimationFrame(()=>{ stripEl.style.transition=''; });
       }, dur);
     }
