@@ -35,7 +35,7 @@ function applyConfig() {
       // Nach 90°-Rotation tauschen sich Breite/Höhe:
       // Container-Breite (wird zur Viewport-Höhe) = vh
       // Container-Höhe  (wird zur Viewport-Breite) = vw
-      container.style.cssText=`position:fixed;left:50%;top:50%;width:${vh}px;height:${vw}px;transform:translate(-50%,-50%) rotate(${rot}deg);transform-origin:center center;`;
+      container.style.cssText=`position:fixed;left:50%;top:50%;width:100vw;height:100vh;transform:translate(-50%,-50%) rotate(${rot}deg);transform-origin:center center;`;
       document.body.classList.add('tv-rotated');
     }else{
       container.style.cssText='';
@@ -126,9 +126,7 @@ function renderMatrix() {
         const slideId=displayIds[i];
         const cell=document.createElement('div');
         cell.className='tv-strip-cell';
-        const isLastInBlock=(i+1)%cols===0;
-        const padRight=isLastInBlock?0:rowGap;
-        cell.style.cssText=`width:calc(100%/${cols});height:100%;flex-shrink:0;position:relative;overflow:hidden;padding-right:${padRight}px;box-sizing:border-box;`;
+        cell.style.cssText=`width:calc(100vw/${cols});height:100%;flex-shrink:0;position:relative;overflow:hidden;`;
         const img=document.createElement('img');
         img.alt=''; img.loading='eager';
         img.style.cssText='width:100%;height:100%;object-fit:var(--crop-mode,cover);display:block;';
