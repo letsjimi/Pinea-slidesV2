@@ -164,6 +164,19 @@ tvApp.use(cors()); tvApp.use(express.json({limit:'50mb'}));
 setupPublicAPI(tvApp);
 tvApp.use('/images', express.static(IMG_DIR));
 tvApp.use(express.static(path.join(__dirname)));
+
+/* Hostname-based routing */
+tvApp.use((req,res,next)=>{
+  const h = req.hostname || '';
+  if(h.startsWith('tvleft.')){
+    return res.sendFile(path.join(__dirname,'tv-left.html'));
+  }
+  if(h.startsWith('tvright.')){
+    return res.sendFile(path.join(__dirname,'tv-right.html'));
+  }
+  next();
+});
+
 tvApp.get('/tv-left', (req,res)=>res.sendFile(path.join(__dirname,'tv-left.html')));
 tvApp.get('/tv-right', (req,res)=>res.sendFile(path.join(__dirname,'tv-right.html')));
 setupErrorHandler(tvApp);
