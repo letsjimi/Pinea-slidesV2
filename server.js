@@ -1,4 +1,4 @@
-// PINEA Slides V4.1 — Dual-Port Server (Admin:8090, TV:8091)
+// PINEA Slides V4.1 — Drei-Port Server (Admin:8090, TV-Left:8091, TV-Right:8092)
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
@@ -11,6 +11,7 @@ const cors = require('cors');
 const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(32).toString('hex');
 const DATA_DIR = path.join(__dirname, 'data');
 const IMG_DIR = path.join(DATA_DIR, 'images');
+const ROOT_DIR = __dirname;
 
 /* ===== DATA HELPERS ===== */
 function ensureDir(dir){ if(!fs.existsSync(dir)) fs.mkdirSync(dir, {recursive:true}); }
@@ -145,46 +146,58 @@ function setupErrorHandler(app){
   app.use((err,req,res,next)=>{ console.error(err); res.status(err.status||500).json({error:err.message||'Internal error'}); });
 }
 
+/* ===== STATIC ASSETS HELPER (nur Assets, keine HTML-Roots) ===== */
+function serveStaticAssets(app){
+  ['/css','/js','/img','/lib'].forEach(p=>{
+    app.use(p, express.static(path.join(ROOT_DIR, p.slice(1))));
+  });
+  // images aus data
+  app.use('/images', express.static(IMG_DIR));
+  // Unpkg proxy (optional, nicht benötigt bei eigenem Host)
+  app.use('/unpkg', express.static(path.join(ROOT_DIR, 'node_modules')));
+}
+
 /* ===== BUILD ADMIN APP (8090) ===== */
 const adminApp = express();
 adminApp.use(cors()); adminApp.use(express.json({limit:'50mb'})); adminApp.use(express.urlencoded({extended:true,limit:'50mb'}));
 setupPublicAPI(adminApp); setupAdminAPI(adminApp);
-adminApp.use('/images', express.static(IMG_DIR));
-adminApp.use(express.static(path.join(__dirname)));
-adminApp.get('/admin', (req,res)=>res.sendFile(path.join(__dirname,'index.html')));
+serveStaticAssets(adminApp);
+// Admin root = index.html mit Login
+adminApp.get('/', (req,res)=>res.sendFile(path.join(ROOT_DIR,'index.html')));
 setupErrorHandler(adminApp);
-
 const adminServer = adminApp.listen(8090, '0.0.0.0', ()=>{
-  console.log(`\n🎬 PINEA Admin — http://0.0.0.0:8090/admin`);
+  console.log(`\n🖥️  Admin    http://localhost:8090   → index.html (Login)`);
 });
 
-/* ===== BUILD TV APP (8091) ===== */
-const tvApp = express();
-tvApp.use(cors()); tvApp.use(express.json({limit:'50mb'}));
-setupPublicAPI(tvApp);
-tvApp.use('/images', express.static(IMG_DIR));
-tvApp.use(express.static(path.join(__dirname)));
-
-/* Hostname-based routing */
-tvApp.use((req,res,next)=>{
-  const h = req.hostname || '';
-  if(h.startsWith('tvleft.')){
-    return res.sendFile(path.join(__dirname,'tv-left.html'));
-  }
-  if(h.startsWith('tvright.')){
-    return res.sendFile(path.join(__dirname,'tv-right.html'));
-  }
-  next();
+/* ===== BUILD TV-LEFT APP (8091) ===== */
+const tvLeftApp = express();
+tvLeftApp.use(cors()); tvLeftApp.use(express.json({limit:'50mb'}));
+setupPublicAPI(tvLeftApp);
+serveStaticAssets(tvLeftApp);
+// TV-Left root = tv-left.html (KEIN index.html, KEIN Login)
+tvLeftApp.get('/', (req,res)=>res.sendFile(path.join(ROOT_DIR,'tv-left.html')));
+setupErrorHandler(tvLeftApp);
+const tvLeftServer = tvLeftApp.listen(8091, '0.0.0.0', ()=>{
+  console.log(`📺 TV-Left  http://localhost:8091   → tv-left.html (öffentlich)`);
 });
 
-tvApp.get('/tv-left', (req,res)=>res.sendFile(path.join(__dirname,'tv-left.html')));
-tvApp.get('/tv-right', (req,res)=>res.sendFile(path.join(__dirname,'tv-right.html')));
-setupErrorHandler(tvApp);
-
-const tvServer = tvApp.listen(8091, '0.0.0.0', ()=>{
-  console.log(`🎬 PINEA TV      — http://0.0.0.0:8091/tv-left`);
-  console.log(`                  — http://0.0.0.0:8091/tv-right\n`);
+/* ===== BUILD TV-RIGHT APP (8092) ===== */
+const tvRightApp = express();
+tvRightApp.use(cors()); tvRightApp.use(express.json({limit:'50mb'}));
+setupPublicAPI(tvRightApp);
+serveStaticAssets(tvRightApp);
+// TV-Right root = tv-right.html (KEIN index.html, KEIN Login)
+tvRightApp.get('/', (req,res)=>res.sendFile(path.join(ROOT_DIR,'tv-right.html')));
+setupErrorHandler(tvRightApp);
+const tvRightServer = tvRightApp.listen(8092, '0.0.0.0', ()=>{
+  console.log(`📺 TV-Right http://localhost:8092   → tv-right.html (öffentlich)`);
 });
 
-process.on('SIGTERM', ()=>{ adminServer.close(()=>tvServer.close(()=>process.exit(0))); });
-process.on('SIGINT',  ()=>{ adminServer.close(()=>tvServer.close(()=>process.exit(0))); });
+console.log(`\n🎬 PINEA Slides v4.1 läuft auf 3 Ports\n`);
+
+process.on('SIGTERM', ()=>{ 
+  adminServer.close(()=>tvLeftServer.close(()=>tvRightServer.close(()=>process.exit(0)))); 
+});
+process.on('SIGINT',  ()=>{ 
+  adminServer.close(()=>tvLeftServer.close(()=>tvRightServer.close(()=>process.exit(0)))); 
+});
