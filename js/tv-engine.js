@@ -18,11 +18,6 @@ export async function initTV(tv) {
   applyConfig(); await render();
   if(config.idleTimeout>0) setupIdle();
   window.addEventListener('keydown', e=>{ if(e.key==='d' && e.ctrlKey){ e.preventDefault(); toggleDebug(); }});
-  let resizeDeb;
-  window.addEventListener('resize',()=>{
-    clearTimeout(resizeDeb);
-    resizeDeb=setTimeout(()=>{ applyConfig(); render(); },250);
-  });
 }
 
 function applyConfig() {
