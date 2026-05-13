@@ -18,6 +18,11 @@ export async function initTV(tv) {
   applyConfig(); await render();
   if(config.idleTimeout>0) setupIdle();
   window.addEventListener('keydown', e=>{ if(e.key==='d' && e.ctrlKey){ e.preventDefault(); toggleDebug(); }});
+  let resizeDeb;
+  window.addEventListener('resize',()=>{
+    clearTimeout(resizeDeb);
+    resizeDeb=setTimeout(()=>{ applyConfig(); render(); },250);
+  });
 }
 
 function applyConfig() {
@@ -32,8 +37,10 @@ function applyConfig() {
     const rot=layout.rotation;
     if(rot===90 || rot===-90){
       const vw=window.innerWidth, vh=window.innerHeight;
-      const size=Math.max(vw,vh);
-      container.style.cssText=`position:fixed;left:50%;top:50%;width:${size}px;height:${size}px;transform:translate(-50%,-50%) rotate(${rot}deg);transform-origin:center center;`;
+      // Nach 90°-Rotation tauschen sich Breite/Höhe:
+      // Container-Breite (wird zur Viewport-Höhe) = vh
+      // Container-Höhe  (wird zur Viewport-Breite) = vw
+      container.style.cssText=`position:fixed;left:50%;top:50%;width:${vh}px;height:${vw}px;transform:translate(-50%,-50%) rotate(${rot}deg);transform-origin:center center;`;
       document.body.classList.add('tv-rotated');
     }else{
       container.style.cssText='';
