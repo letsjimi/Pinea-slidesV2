@@ -13,7 +13,7 @@ export async function initTV(tv) {
     rows:3, cols:2, timelines:[[],[],[]],
     rowAnimationModes:['cell','cell','cell'],
     rowSteps:[1,1,1], stripSteps:[1,1,1],
-    cellGap:4, useMatrix:true, rowOffsets:[0,2000,4000]
+    rowCellGaps:[4,4,4], useMatrix:true, rowOffsets:[0,2000,4000]
   };
   applyConfig(); await render();
   if(config.idleTimeout>0) setupIdle();
@@ -26,23 +26,21 @@ function applyConfig() {
   document.documentElement.style.setProperty('--grid-color', config.gridColor||'#ff3366');
   document.documentElement.style.setProperty('--grid-opacity', config.gridOpacity||0.4);
   document.documentElement.style.setProperty('--grid-width', (config.gridWidthPx||1)+'px');
+  // TV-Rotation
   const container=document.getElementById('tvContainer');
   if(container && layout.rotation){
     const rot=layout.rotation;
-    container.style.transform=`rotate(${rot}deg)`;
     if(rot===90 || rot===-90){
-      container.style.width='100vh'; container.style.height='100vw';
-      container.style.left='50%'; container.style.top='50%';
-      container.style.transform=`rotate(${rot}deg) translate(-50%,-50%)`;
-      container.style.transformOrigin='center center';
+      const vw=window.innerWidth, vh=window.innerHeight;
+      const size=Math.max(vw,vh);
+      container.style.cssText=`position:fixed;left:50%;top:50%;width:${size}px;height:${size}px;transform:translate(-50%,-50%) rotate(${rot}deg);transform-origin:center center;`;
       document.body.classList.add('tv-rotated');
     }else{
-      container.style.width=''; container.style.height='';
-      container.style.left=''; container.style.top='';
-      container.style.transformOrigin='';
+      container.style.cssText='';
       document.body.classList.remove('tv-rotated');
     }
   } else if(container) {
+    container.style.cssText='';
     document.body.classList.remove('tv-rotated');
   }
   const gc=config.gridCols||2, gr=config.gridRows||2;
@@ -83,7 +81,7 @@ function showScreensaver(show){
 /* MATRIX */
 function renderMatrix() {
   const rows=layout.rows||3, cols=layout.cols||2;
-  const timelines=layout.timelines||[], gap=layout.cellGap||0;
+  const timelines=layout.timelines||[];
   const container=document.getElementById('tvContainer');
   if(!container) return console.error('[TV] tvContainer nicht gefunden');
 
@@ -92,13 +90,14 @@ function renderMatrix() {
   const isMixedModes=(layout.rowAnimationModes||[]).some((m,i,a)=>m!==a[0]);
 
   if(isMixedModes){
-    matrix.style.cssText=`display:flex;flex-direction:column;gap:${gap}px;position:absolute;inset:0;z-index:1;`;
+    matrix.style.cssText=`display:flex;flex-direction:column;position:absolute;inset:0;z-index:1;`;
   }else{
     const firstMode=(layout.rowAnimationModes?.[0])||'cell';
     if(firstMode==='strip'){
-      matrix.style.cssText=`display:flex;flex-direction:column;gap:${gap}px;position:absolute;inset:0;z-index:1;`;
+      matrix.style.cssText=`display:flex;flex-direction:column;position:absolute;inset:0;z-index:1;`;
     }else{
-      matrix.style.cssText=`display:grid;grid-template-rows:repeat(${rows},1fr);grid-template-columns:repeat(${cols},1fr);gap:${gap}px;position:absolute;inset:0;z-index:1;`;
+      const globalGap=layout.cellGap||4;
+      matrix.style.cssText=`display:grid;grid-template-rows:repeat(${rows},1fr);grid-template-columns:repeat(${cols},1fr);gap:${globalGap}px;position:absolute;inset:0;z-index:1;`;
     }
   }
 
@@ -108,16 +107,17 @@ function renderMatrix() {
     const mode=(layout.rowAnimationModes?.[r])||'cell';
     const isStrip=mode==='strip';
     const step=(isStrip?(layout.stripSteps?.[r]):(layout.rowSteps?.[r]))||1;
+    const rowGap=(layout.rowCellGaps?.[r])!==undefined ? layout.rowCellGaps[r] : (layout.cellGap||4);
 
     if(isStrip){
       const rowWrapper=document.createElement('div');
       rowWrapper.className='tv-row';
-      rowWrapper.style.cssText=`flex:1;overflow:hidden;position:relative;background:#000;`;
+      rowWrapper.style.cssText=`flex:1;overflow:hidden;position:relative;background:#000;margin-bottom:${(r<rows-1)?rowGap+'px':'0'};`;
 
       const strip=document.createElement('div');
       strip.className='tv-strip';
       strip.dataset.row=r;
-      strip.style.cssText=`display:flex;height:100%;`;
+      strip.style.cssText=`display:flex;height:100%;gap:${rowGap}px;`;
       const displayIds=[...ids,...ids,...ids];
 
       for(let i=0;i<displayIds.length;i++){

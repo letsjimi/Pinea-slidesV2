@@ -58,6 +58,24 @@ db.version(3).stores({
     });
 });
 
+db.version(4).stores({
+    groups:   'id++, name, sortOrder',
+    slides:   'id++, groupId, sortOrder, tvAssignment',
+    config:   'id',
+    layouts:  'tvId'
+}).upgrade(async tx => {
+    await tx.table('layouts').toCollection().modify(layout => {
+        const rows = layout.rows || 3;
+        const oldGap = layout.cellGap || 4;
+        
+        if (!layout.rowCellGaps || !Array.isArray(layout.rowCellGaps)) {
+            layout.rowCellGaps = Array.from({length: rows}, () => oldGap);
+        }
+        while (layout.rowCellGaps.length < rows) layout.rowCellGaps.push(oldGap);
+        layout.rowCellGaps.length = rows;
+    });
+});
+
 const DEFAULT_CONFIG = {
     id:              'global',
     gridColor:       '#ff3366',
@@ -100,7 +118,7 @@ async function initDB() {
                 rowAnimationModes: ['cell', 'cell', 'cell'],
                 rowSteps: [1, 1, 1],
                 stripSteps: [1, 1, 1],
-                cellGap: 4, useMatrix: true,
+                rowCellGaps: [4, 4, 4],
                 rowOffsets: [0, 2000, 4000],
             });
         }

@@ -37,6 +37,10 @@ async function refreshTimelineData() {
       if(!layoutData.stripSteps||!Array.isArray(layoutData.stripSteps)){
         layoutData.stripSteps=Array.from({length:rows},()=>1);
       }
+      if(!layoutData.rowCellGaps||!Array.isArray(layoutData.rowCellGaps)){
+        const oldGap=layoutData.cellGap||4;
+        layoutData.rowCellGaps=Array.from({length:rows},()=>oldGap);
+      }
       if(!layoutData.rowOffsets||!Array.isArray(layoutData.rowOffsets)){
         layoutData.rowOffsets=Array.from({length:rows},(_,i)=>i*2000);
       }
@@ -57,7 +61,7 @@ async function refreshTimelineData() {
       if(rotEl) rotEl.value=layoutData.rotation||'0';
       console.log('[Timeline] Layout geladen für', currentTV, ':', layoutData);
     } else {
-      layoutData={tvId:currentTV,rows:3,cols:2,timelines:[[],[],[]],rowAnimationModes:['cell','cell','cell'],rowSteps:[1,1,1],stripSteps:[1,1,1],cellGap:4,useMatrix:true,rowOffsets:[0,2000,4000]};
+      layoutData={tvId:currentTV,rows:3,cols:2,timelines:[[],[],[]],rowAnimationModes:['cell','cell','cell'],rowSteps:[1,1,1],stripSteps:[1,1,1],rowCellGaps:[4,4,4],cellGap:4,useMatrix:true,rowOffsets:[0,2000,4000]};
       await db.layouts.put(layoutData);
       console.log('[Timeline] Default-Layout erstellt für', currentTV);
     }
@@ -120,7 +124,7 @@ window.timelineDragStart=function(e,slideId){
 /* ROWS */
 function renderAllRows() {
   const c=document.getElementById('timelineRows'); if(!c) { console.warn('[Timeline] timelineRows nicht gefunden'); return; }
-  const {rows,timelines,rowAnimationModes,rowSteps,stripSteps}=layoutData;
+  const {rows,timelines,rowAnimationModes,rowSteps,stripSteps,rowCellGaps}=layoutData;
   console.log('[Timeline] renderAllRows() — rows:', rows, 'timelines:', timelines);
   if(!rows){ c.innerHTML=`<div style="text-align:center;padding:30px;color:#555;">Reihen > 0 einstellen.</div>`; return; }
   c.innerHTML=Array.from({length:rows},(_,ri)=>{
@@ -145,6 +149,9 @@ function renderAllRows() {
         </div>
         <div class="form-row" style="margin:0;"><label>Stagger (ms):</label>
           <input type="number" value="${(layoutData.rowOffsets?.[ri]||0)}" min="0" max="20000" step="500" style="width:90px;" onchange="window.updateRowOffset(${ri},this.value)">
+        </div>
+        <div class="form-row" style="margin:0;"><label>Lücke (px):</label>
+          <input type="number" value="${(rowCellGaps?.[ri])!==undefined?rowCellGaps[ri]:(layoutData.cellGap||4)}" min="0" max="50" style="width:70px;" onchange="window.updateRowCellGap(${ri},this.value)">
         </div>
       </div>
       <div class="row-strip ${has?'':'row-strip-empty'}" data-row="${ri}" ondragover="window.rowDragOver(event)" ondragleave="window.rowDragLeave(event)" ondrop="window.rowDrop(event,${ri})">
@@ -194,6 +201,14 @@ window.updateRowOffset=async function(ri,newVal){
   offsets[ri]=parseInt(newVal)||0;
   layoutData.rowOffsets=offsets;
   await db.layouts.put(layoutData); toast(`Zeile ${ri+1}: Offset = ${newVal}ms`,'success');
+};
+
+window.updateRowCellGap=async function(ri,newVal){
+  const gaps=[...(layoutData.rowCellGaps||[])];
+  while(gaps.length<(layoutData.rows||3)) gaps.push(layoutData.cellGap||4);
+  gaps[ri]=parseInt(newVal)||0;
+  layoutData.rowCellGaps=gaps;
+  await db.layouts.put(layoutData); toast(`Zeile ${ri+1}: Lücke = ${newVal}px`,'success');
 };
 
 /* DRAG & DROP */
@@ -251,11 +266,13 @@ window.updateMatrixFromSettings=async function(){
   const rowSteps=[...(layoutData.rowSteps||[])];
   const stripSteps=[...(layoutData.stripSteps||[])];
   const offsets=[...(layoutData.rowOffsets||[])];
+  const rowGaps=[...(layoutData.rowCellGaps||[])];
   while(modes.length<r) modes.push(modes[0]||'cell');
   while(rowSteps.length<r) rowSteps.push(rowSteps[0]||1);
   while(stripSteps.length<r) stripSteps.push(1);
   while(offsets.length<r) offsets.push(offsets.length*2000);
-  modes.length=r; rowSteps.length=r; stripSteps.length=r; offsets.length=r;
-  layoutData={...layoutData,rows:r,cols:c,cellGap:gap,timelines:newT,rowAnimationModes:modes,rowSteps,stripSteps,rowOffsets:offsets,rotation};
+  while(rowGaps.length<r) rowGaps.push(gap);
+  modes.length=r; rowSteps.length=r; stripSteps.length=r; offsets.length=r; rowGaps.length=r;
+  layoutData={...layoutData,rows:r,cols:c,cellGap:gap,timelines:newT,rowAnimationModes:modes,rowSteps,stripSteps,rowOffsets:offsets,rowCellGaps:rowGaps,rotation};
   await db.layouts.put(layoutData); renderAllRows(); toast('Layout aktualisiert','success');
 };
