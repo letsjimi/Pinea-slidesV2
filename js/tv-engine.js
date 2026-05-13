@@ -425,7 +425,6 @@ function applyTransition(img, newUrl, oldSrc, type, dur){
 }
 
 /* IMAGE URL RESOLVER (Server Backend v4.1) */
-const urlCache=new Map();
 async function loadSlideImage(slideId){
   if(!slideId) return null;
   const cached=urlCache.get(slideId);
