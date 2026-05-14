@@ -10,6 +10,7 @@ function hasImage(s){ return !!(s.imageUrl || s.imageFilename); }
 
 let allSlides=[], layoutData={rows:3,cols:2,timelines:[[],[],[]],rowAnimationModes:['cell','cell','cell'],rowSteps:[1,1,1],stripSteps:[1,1,1],cellGap:4,useMatrix:true};
 let dragSrc=null, currentTV='left';
+let poolSelection = new Set(); // Mehrfachauswahl im Pool
 
 export async function initTimelineEditor() {
   console.log('[Timeline] initTimelineEditor() startet...');
@@ -99,17 +100,19 @@ function renderPool() {
   if(!tvSlides.length){
     console.log('[Timeline] Keine Bilder für', currentTV);
     pool.innerHTML=`<div style="grid-column:1/-1;text-align:center;padding:20px;color:#555;font-size:14px;">
-      🚫 Keine Bilder für diesen TV.<br><br>
-      Lösung:<br>
-      1. Gehe zum <strong>Slides</strong>-Tab<br>
-      2. Erstelle Testbilder oder lade Bilder hoch<br>
+      🚫 Keine Bilder für diesen TV.\n<br><br>
+      Lösung:\n<br>
+      1. Gehe zum <strong>Slides</strong>-Tab\n<br>
+      2. Erstelle Testbilder oder lade Bilder hoch\n<br>
       3. Stelle sicher, dass die Bilder TV-Zuweisung haben (🔄 📺 klicken)
     </div>`;
     return;
   }
   pool.innerHTML=tvSlides.map(s=>{
     const url=getSlideUrl(s);
-    return `<div class="timeline-pool-item" draggable="true" data-slide-id="${s.id}" ondragstart="window.timelineDragStart(event,'${s.id}')">
+    const isSelected=poolSelection.has(s.id);
+    return `<div class="timeline-pool-item ${isSelected?'selected':''}" data-slide-id="${s.id}" onclick="window.togglePoolSelection(event,${s.id})" draggable="true" ondragstart="window.timelineDragStart(event,'${s.id}')">
+      <div style="position:absolute;top:4px;left:4px;z-index:10;"><input type="checkbox" ${isSelected?'checked':''} onclick="event.stopPropagation(); window.togglePoolSelection(event,${s.id})" style="width:18px;height:18px;accent-color:#ff3366;"></div>
       <img src="${url}" alt="${s.name}" data-src="1">
       <div class="pool-overlay">
         <div class="pool-dot" style="background:${s.groupColor||'#555'}"></div>
@@ -119,6 +122,68 @@ function renderPool() {
   }).join('');
   console.log('[Timeline] renderPool() fertig —', tvSlides.length, 'Bilder gerendert');
 }
+
+/* POOL SELECTION */
+window.togglePoolSelection=function(e,slideId){
+  e.stopPropagation(); e.preventDefault();
+  if(poolSelection.has(slideId)) poolSelection.delete(slideId); else poolSelection.add(slideId);
+  renderPool();
+  const count=poolSelection.size;
+  const btn=document.getElementById('poolSelectAllBtn');
+  if(btn) btn.textContent=count>0?`☐ ${count} ausgewählt`:'☑️ Alle';
+};
+window.togglePoolSelectAll=function(){
+  const tvSlides=allSlides.filter(s=>{ const tvMatch=s.tvAssignment===currentTV||s.tvAssignment==='both'; return hasImage(s)&&tvMatch; });
+  if(poolSelection.size===tvSlides.length){ poolSelection.clear(); }
+  else{ tvSlides.forEach(s=>poolSelection.add(s.id)); }
+  renderPool();
+  const btn=document.getElementById('poolSelectAllBtn');
+  if(btn) btn.textContent=poolSelection.size>0?`☐ ${poolSelection.size} ausgewählt`:'☑️ Alle';
+};
+
+/* BATCH ADD */
+window.showBatchAddDialog=function(){
+  if(!poolSelection.size){ toast('Bitte wähle mindestens ein Bild aus dem Pool aus.','info'); return; }
+  const rows=layoutData.rows||3;
+  const sel=document.getElementById('batchAddRowSelect');
+  sel.innerHTML=Array.from({length:rows},(_,i)=>
+    `<option value="${i}">Zeile ${i+1} (${(layoutData.timelines[i]||[]).length} Bilder)</option>`
+  ).join('')+'<option value="new">✨ Neue Zeile</option>';
+  document.getElementById('batchAddDialog').style.display='block';
+};
+window.confirmBatchAdd=async function(){
+  const rowIdx=document.getElementById('batchAddRowSelect').value;
+  if(rowIdx==='new'){
+    // add new row
+    const rows=(layoutData.rows||3)+1;
+    layoutData.rows=rows;
+    layoutData.timelines=[...(layoutData.timelines||[]),[]];
+    layoutData.rowAnimationModes=[...(layoutData.rowAnimationModes||[]),'cell'];
+    layoutData.rowSteps=[...(layoutData.rowSteps||[]),1];
+    layoutData.stripSteps=[...(layoutData.stripSteps||[]),1];
+    layoutData.rowOffsets=[...(layoutData.rowOffsets||[]),(rows-1)*2000];
+    layoutData.rowCellGaps=[...(layoutData.rowCellGaps||[]),4];
+    await db.layouts.put(layoutData);
+    renderAllRows();
+    toast('Neue Zeile hinzugefügt','success');
+    document.getElementById('batchAddDialog').style.display='none';
+    return;
+  }
+  const r=parseInt(rowIdx);
+  const timelines=layoutData.timelines.map(t=>[...t]);
+  const arr=poolSelection.size?[...poolSelection]:[];
+  if(r<0||r>=timelines.length){ toast('Ungültige Zeile','error'); return; }
+  timelines[r]=[...(timelines[r]||[]),...arr];
+  layoutData.timelines=timelines;
+  await db.layouts.put(layoutData);
+  poolSelection.clear();
+  renderPool();
+  renderAllRows();
+  document.getElementById('batchAddDialog').style.display='none';
+  toast(`${arr.length} Bilder zu Zeile ${r+1} hinzugefügt`,'success');
+  const btn=document.getElementById('poolSelectAllBtn');
+  if(btn) btn.textContent='☑️ Alle';
+};
 
 window.timelineDragStart=function(e,slideId){
   console.log('[Timeline] DragStart — slideId:', slideId);
@@ -171,9 +236,23 @@ function renderSlot(rowIdx,slotIdx,slideId) {
   const slide=allSlides.find(s=>s.id===slideId); if(!slide) return `<div class="row-slot row-slot-empty" data-row="${rowIdx}" data-slot="${slotIdx}">?</div>`;
   const url=getSlideUrl(slide);
   return `<div class="row-slot assigned" draggable="true" data-row="${rowIdx}" data-slot="${slotIdx}" data-slide-id="${slideId}" ondragstart="window.slotDragStart(event,${slideId},${rowIdx},${slotIdx})" ondragover="window.slotDragOver(event)" ondrop="window.slotDrop(event,${rowIdx},${slotIdx})">
-    <img src="${url}" alt="${slide.name}" data-src="1"><div class="slot-overlay"><div class="slot-dot" style="background:${slide.groupColor||'#555'}"></div><div class="slot-name">${slide.name.substring(0,12)}</div></div>
+    <img src="${url}" alt="${slide.name}" data-src="1">
+    <div class="slot-sort-btns">
+      <button onclick="window.moveSlot(${rowIdx},${slotIdx},-1);event.stopPropagation();" title="Nach links">◀</button>
+      <button onclick="window.moveSlot(${rowIdx},${slotIdx},1);event.stopPropagation();" title="Nach rechts">▶</button>
+    </div>
+    <div class="slot-overlay"><div class="slot-dot" style="background:${slide.groupColor||'#555'}"></div><div class="slot-name">${slide.name.substring(0,12)}</div></div>
     <button class="slot-del" onclick="window.removeFromRow(${rowIdx},${slotIdx})" title="Entfernen">×</button></div>`;
 }
+
+window.moveSlot=async function(rowIdx,slotIdx,dir){
+  const t=layoutData.timelines.map(x=>[...x]); const row=t[rowIdx]; if(!row||!row.length) return;
+  const newIdx=slotIdx+dir; if(newIdx<0||newIdx>=row.length) return;
+  [row[slotIdx],row[newIdx]]=[row[newIdx],row[slotIdx]];
+  t[rowIdx]=row; layoutData.timelines=t;
+  await db.layouts.put(layoutData); renderAllRows();
+  toast('Reihenfolge geändert','success');
+};
 
 /* ROW-LEVEL UPDATES */
 window.updateRowMode=async function(ri,newMode){

@@ -5,12 +5,13 @@
   "gridOpacity": 0.4,
   "gridWidthPx": 1,
   "gridCols": 2,
-  "gridRows": 2,
+  "gridRows": 3,
   "cropMode": "cover",
-  "transitionType": "fade",
+  "transitionType": "slide",
   "transitionSettings": {
     "duration": 1200,
-    "easing": "ease-in-out"
+    "easing": "linear",
+    "direction": "left"
   },
   "showGroupLabel": true,
   "groupLabelPos": "bottom",
@@ -19,5 +20,5 @@
   "debugOverlay": false,
   "autoStart": true,
   "idleTimeout": 0,
-  "slideshowSpeed": 5000
+  "slideshowSpeed": 10000
 }
