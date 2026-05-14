@@ -706,5 +706,17 @@
     "sortOrder": 58,
     "uploadedAt": 1778705926132,
     "id": 1778705927067
+  },
+  {
+    "groupId": 2,
+    "groupName": "Programm",
+    "groupColor": "#ffaa00",
+    "tvAssignment": "both",
+    "imageFilename": "images-1778742018288-767329117.png",
+    "imageUrl": "/api/images/images-1778742018288-767329117.png",
+    "name": "4.png",
+    "sortOrder": 59,
+    "uploadedAt": 1778742018573,
+    "id": 1778742018435
   }
 ]

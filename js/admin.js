@@ -36,7 +36,7 @@ async function initApp(){
   try {
     await initDB(); dbReady=true;
     await loadGroups(); await loadSlides(); await loadConfig();
-    setupFilters(); renderGroups(); renderSlides(); renderGroupPills();
+    setupFilters(); renderGroups(); renderSlides(); renderGroupPills(); updateFilterOptions();
     import('./admin-timeline.js').then(m=>{ if(m.initTimelineEditor) m.initTimelineEditor(); timelineLoaded=true; }).catch(()=>{});
     console.log('PINEA Admin v4.1 ready');
   } catch(err) { toast('Fehler beim Starten: '+err.message,'error'); }
@@ -280,7 +280,7 @@ function renderSlides() {
     return `<div class="thumb-item" draggable="true" data-id="${s.id}" data-idx="${idx}" ondragstart="window.slideDragStart(${s.id})" ondragover="event.preventDefault()" ondrop="window.slideDrop(event,${idx})" ondragend="window.slideDragEnd()">
       <img src="${url}" alt="${s.name}" loading="lazy">
       <div class="thumb-overlay"><span>${s.name.substring(0,20)}</span><span style="font-size:10px;opacity:.7">${s.tvAssignment} | ${s.groupName}</span></div>
-      <div class="thumb-actions"><button onclick="window.deleteSlide(${s.id})" title="Löschen">🗑️</button><button onclick="window.cycleTV(${s.id})" title="TV">📺</button></div>
+      <div class="thumb-actions"><button onclick="window.deleteSlide(${s.id})" title="Löschen">🗑️</button><button onclick="window.cycleTV(${s.id})" title="TV-Zuweisung: Umschalten zwischen Beide/Links/Rechts">📺</button></div>
     </div>`;
   }).join('');
 }

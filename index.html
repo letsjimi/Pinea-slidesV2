@@ -44,6 +44,16 @@
   <!-- TAB: SLIDES -->
   <section id="tab-slides" class="tab-content active">
     <div class="card">
+      <h2>📂 Gruppen</h2>
+      <div id="groupList"></div>
+      <div class="group-add-form">
+        <input type="text" id="newGroupName" placeholder="Neue Gruppe...">
+        <input type="color" id="newGroupColor" value="#ff3366">
+        <button class="btn btn-primary" onclick="addGroup()">+ Hinzufügen</button>
+      </div>
+    </div>
+
+    <div class="card">
       <div class="row-header">
         <h2>📁 Slide-Galerie</h2>
         <div style="display:flex;align-items:center;gap:12px;">
@@ -60,16 +70,6 @@
       </div>
       <div id="slideGrid" class="thumb-grid"></div>
       <p id="slideEmptyHint" style="display:none;text-align:center;color:#555;padding:40px;">Keine Bilder vorhanden. Wechsle zum Upload-Tab um Testbilder zu generieren.</p>
-    </div>
-
-    <div class="card">
-      <h2>📂 Gruppen</h2>
-      <div id="groupList"></div>
-      <div class="group-add-form">
-        <input type="text" id="newGroupName" placeholder="Neue Gruppe...">
-        <input type="color" id="newGroupColor" value="#ff3366">
-        <button class="btn btn-primary" onclick="addGroup()">+ Hinzufügen</button>
-      </div>
     </div>
   </section>
 
