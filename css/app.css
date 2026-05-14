@@ -154,7 +154,7 @@ body.tv-rotated .tv-container{position:fixed;}
 .row-strip-empty{justify-content:center;align-items:center}
 .row-empty-hint{color:#555;font-size:13px}
 
-.row-slot{position:relative;width:120px;height:213px;border-radius:8px;overflow:hidden;flex-shrink:0;cursor:grab;background:#1a1a20;border:2px solid transparent;transition:border-color .2s}
+.row-slot{position:relative;width:120px;height:var(--slot-height,213px);border-radius:8px;overflow:hidden;flex-shrink:0;cursor:grab;background:#1a1a20;border:2px solid transparent;transition:border-color .2s}
 .row-slot:hover{border-color:#555}
 .row-slot.assigned{border-color:#333}
 .row-slot.dragover{border-color:#ff3366;transform:scale(1.02)}

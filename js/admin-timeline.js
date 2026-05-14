@@ -215,11 +215,29 @@ window.timelineDragStart=function(e,slideId){
   e.dataTransfer.setData('text/plain',JSON.stringify(dragSrc));
 };
 
+/* ASPECT RATIO */
+function updateSlotAspectRatio(){
+  const cols=layoutData.cols||2;
+  const rows=layoutData.rows||3;
+  const rotation=layoutData.rotation||0;
+  const isPortrait=Math.abs(rotation)===90;
+  let arW,arH;
+  if(isPortrait){
+    arW=rows; arH=cols;
+  }else{
+    arW=cols; arH=rows;
+  }
+  const slotHeight=Math.round((120/arW)*arH);
+  document.documentElement.style.setProperty('--slot-height',slotHeight+'px');
+  document.querySelectorAll('.row-strip').forEach(s=> s.style.minHeight=(slotHeight+24)+'px');
+}
+
 /* ROWS */
 function renderAllRows() {
   const c=document.getElementById('timelineRows'); if(!c) { console.warn('[Timeline] timelineRows nicht gefunden'); return; }
   const {rows,timelines,rowAnimationModes,rowSteps,stripSteps,rowCellGaps}=layoutData;
   console.log('[Timeline] renderAllRows() — rows:', rows, 'timelines:', timelines);
+  updateSlotAspectRatio();
   if(!rows){ c.innerHTML=`<div style="text-align:center;padding:30px;color:#555;">Reihen > 0 einstellen.</div>`; return; }
   c.innerHTML=Array.from({length:rows},(_,ri)=>{
     const ids=timelines[ri]||[]; const has=ids.length>0;
