@@ -185,7 +185,12 @@ window.togglePoolSelection=function(e,slideId){
   if(btn) btn.textContent=count>0?`☐ ${count} ausgewählt`:'☑️ Alle';
 };
 window.togglePoolSelectAll=function(){
-  const tvSlides=allSlides.filter(s=>{ const tvMatch=s.tvAssignment===currentTV||s.tvAssignment==='both'; return hasImage(s)&&tvMatch; });
+  // Nur die aktuell sichtbaren Slides (gleiche Logik wie renderPool)
+  const tvSlides=allSlides.filter(s=>{
+    const tvMatch=s.tvAssignment===currentTV||s.tvAssignment==='both';
+    const groupMatch=!activeGroupFilter||s.groupName===activeGroupFilter;
+    return hasImage(s)&&tvMatch&&groupMatch;
+  });
   if(poolSelection.size===tvSlides.length){ poolSelection.clear(); }
   else{ tvSlides.forEach(s=>poolSelection.add(s.id)); }
   renderPool();
