@@ -227,8 +227,13 @@ function updateSlotAspectRatio(){
   }else{
     arW=cols; arH=rows;
   }
-  const slotHeight=Math.round((120/arW)*arH);
+  const slotHeight=Math.round((200/arW)*arH);
+  document.documentElement.style.setProperty('--slot-width','200px');
   document.documentElement.style.setProperty('--slot-height',slotHeight+'px');
+  const poolWidth=100;
+  const poolHeight=Math.round((poolWidth/arW)*arH);
+  document.documentElement.style.setProperty('--pool-width',poolWidth+'px');
+  document.documentElement.style.setProperty('--pool-height',poolHeight+'px');
   document.querySelectorAll('.row-strip').forEach(s=> s.style.minHeight=(slotHeight+24)+'px');
 }
 
