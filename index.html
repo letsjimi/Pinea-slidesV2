@@ -43,33 +43,41 @@
 
   <!-- TAB: SLIDES -->
   <section id="tab-slides" class="tab-content active">
-    <div class="card">
-      <h2>📂 Gruppen</h2>
-      <div id="groupList"></div>
-      <div class="group-add-form">
-        <input type="text" id="newGroupName" placeholder="Neue Gruppe...">
-        <input type="color" id="newGroupColor" value="#ff3366">
-        <button class="btn btn-primary" onclick="addGroup()">+ Hinzufügen</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="row-header">
-        <h2>📁 Slide-Galerie</h2>
-        <div style="display:flex;align-items:center;gap:12px;">
-          <select id="filterGroup" class="form-select"><option value="">Alle Gruppen</option></select>
-          <select id="filterTV" class="form-select">
-            <option value="">Alle TVs</option>
-            <option value="left">TV Links</option>
-            <option value="right">TV Rechts</option>
-            <option value="both">Beide</option>
-          </select>
-          <button class="btn btn-ghost" onclick="generateTestImages()">🎨 Testbilder</button>
-          <input type="number" id="testImageCount" value="6" min="1" max="24" style="width:60px;">
+    <div style="display:grid;grid-template-columns:1fr 260px;gap:20px;align-items:start;">
+      <div>
+        <div class="card">
+          <div class="row-header">
+            <h2>📁 Slide-Galerie</h2>
+            <div style="display:flex;align-items:center;gap:12px;">
+              <select id="filterGroup" class="form-select"><option value="">Alle Gruppen</option></select>
+              <select id="filterTV" class="form-select">
+                <option value="">Alle TVs</option>
+                <option value="left">TV Links</option>
+                <option value="right">TV Rechts</option>
+                <option value="both">Beide</option>
+              </select>
+              <button class="btn btn-ghost" onclick="generateTestImages()">🎨 Testbilder</button>
+              <input type="number" id="testImageCount" value="6" min="1" max="24" style="width:60px;">
+            </div>
+          </div>
+          <div id="slideGrid" class="thumb-grid"></div>
+          <p id="slideEmptyHint" style="display:none;text-align:center;color:#555;padding:40px;">Keine Bilder vorhanden. Wechsle zum Upload-Tab um Testbilder zu generieren.</p>
         </div>
       </div>
-      <div id="slideGrid" class="thumb-grid"></div>
-      <p id="slideEmptyHint" style="display:none;text-align:center;color:#555;padding:40px;">Keine Bilder vorhanden. Wechsle zum Upload-Tab um Testbilder zu generieren.</p>
+
+      <div>
+        <div class="card" style="padding:14px;">
+          <h2 style="font-size:14px;margin-bottom:10px;">📂 Gruppen</h2>
+          <div id="groupList" style="margin-bottom:12px;"></div>
+          <div class="group-add-form" style="flex-direction:column;align-items:stretch;gap:8px;border-top:1px solid #2a2a30;padding-top:12px;margin-top:0;">
+            <input type="text" id="newGroupName" placeholder="Neue Gruppe..." style="min-width:0;">
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input type="color" id="newGroupColor" value="#ff3366" style="width:40px;height:32px;padding:2px;flex-shrink:0;">
+              <button class="btn btn-primary" onclick="addGroup()" style="width:100%;font-size:12px;padding:8px;">+ Hinzufügen</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </section>
 
