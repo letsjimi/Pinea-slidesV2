@@ -1,5 +1,11 @@
 [
   {
+    "id": 1,
+    "name": "Allgemein",
+    "color": "#00aaff",
+    "sortOrder": 0
+  },
+  {
     "id": 2,
     "name": "Programm",
     "color": "#ffaa00",
@@ -10,17 +16,5 @@
     "name": "Specials",
     "color": "#00ff88",
     "sortOrder": 2
-  },
-  {
-    "name": "Allgemein",
-    "color": "#ff3366",
-    "sortOrder": 3,
-    "id": 1778744572930
-  },
-  {
-    "name": "Infos",
-    "color": "#3341ff",
-    "sortOrder": 4,
-    "id": 1778744593918
   }
 ]
