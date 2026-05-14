@@ -229,6 +229,7 @@ window.adjustPoolZoom=function(delta){
   const pct=Math.round(poolZoomScale*100);
   const el=document.getElementById('poolZoomValue');
   if(el) el.textContent=pct+'%';
+  updateSlotAspectRatio(); // CSS-Variablen sofort aktualisieren
   renderPool();
 };
 
@@ -269,21 +270,21 @@ function renderAllRows() {
       <div style="display:flex;gap:6px;align-items:center;">
       ${has?`<button class="btn btn-ghost" style="padding:6px 10px;font-size:12px;" onclick="window.scrollRow(${ri},-1)" title="Links scrollen">◀</button><button class="btn btn-ghost" style="padding:6px 10px;font-size:12px;" onclick="window.scrollRow(${ri},1)" title="Rechts scrollen">▶</button>`:''}
       <button class="btn btn-ghost" style="padding:6px 10px;font-size:12px;" onclick="window.clearRow(${ri})" title="Leeren">🗑️</button></div></div>
-      <div class="row-controls" style="display:flex;gap:12px;flex-wrap:wrap;padding:8px 12px;background:#14141a;border-radius:8px;margin-bottom:8px;align-items:center;">
-        <div class="form-row" style="margin:0;"><label>Modus:</label>
-          <select onchange="window.updateRowMode(${ri},this.value)" style="width:140px;">
+      <div class="row-controls" style="display:flex;gap:8px;flex-wrap:wrap;padding:8px 12px;background:#14141a;border-radius:8px;margin-bottom:8px;align-items:center;">
+        <div class="form-row" style="margin:0;gap:6px;"><label style="min-width:auto;white-space:nowrap;">Modus:</label>
+          <select onchange="window.updateRowMode(${ri},this.value)" style="width:auto;min-width:120px;">
             <option value="cell" ${mode==='cell'?'selected':''}>Zellen-Wechsel</option>
             <option value="strip" ${mode==='strip'?'selected':''}>Scroll-Streifen</option>
           </select>
         </div>
-        <div class="form-row" style="margin:0;"><label>${mode==='strip'?'Strip-Schritt':'Zellen-Schritt'}:</label>
-          <input type="number" value="${step}" min="1" max="10" style="width:70px;" onchange="window.updateRowStep(${ri},this.value)">
+        <div class="form-row" style="margin:0;gap:6px;"><label style="min-width:auto;white-space:nowrap;">${mode==='strip'?'Strip-Schritt':'Zellen-Schritt'}:</label>
+          <input type="number" value="${step}" min="1" max="10" style="width:64px;" onchange="window.updateRowStep(${ri},this.value)">
         </div>
-        <div class="form-row" style="margin:0;"><label>Stagger (ms):</label>
-          <input type="number" value="${(layoutData.rowOffsets?.[ri]||0)}" min="0" max="20000" step="500" style="width:90px;" onchange="window.updateRowOffset(${ri},this.value)">
+        <div class="form-row" style="margin:0;gap:6px;"><label style="min-width:auto;white-space:nowrap;">Stagger (ms):</label>
+          <input type="number" value="${(layoutData.rowOffsets?.[ri]||0)}" min="0" max="20000" step="500" style="width:80px;" onchange="window.updateRowOffset(${ri},this.value)">
         </div>
-        <div class="form-row" style="margin:0;"><label>Lücke (px):</label>
-          <input type="number" value="${(rowCellGaps?.[ri])!==undefined?rowCellGaps[ri]:(layoutData.cellGap||4)}" min="0" max="50" style="width:70px;" onchange="window.updateRowCellGap(${ri},this.value)">
+        <div class="form-row" style="margin:0;gap:6px;"><label style="min-width:auto;white-space:nowrap;">Lücke (px):</label>
+          <input type="number" value="${(rowCellGaps?.[ri])!==undefined?rowCellGaps[ri]:(layoutData.cellGap||4)}" min="0" max="50" style="width:64px;" onchange="window.updateRowCellGap(${ri},this.value)">
         </div>
       </div>
       <div class="row-strip ${has?'':'row-strip-empty'}" data-row="${ri}" ondragover="window.rowDragOver(event)" ondragleave="window.rowDragLeave(event)" ondrop="window.rowDrop(event,${ri})">
