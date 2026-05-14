@@ -85,6 +85,8 @@ function renderIPLinks() {
   updateTVPreviewRotation('right');
 }
 
+let ratioLocked = false;
+
 async function updateTVPreviewRotation(side) {
   try {
     const layout = await api.getLayout(side);
@@ -97,6 +99,12 @@ async function updateTVPreviewRotation(side) {
       if (rot === 90) frame.classList.add('rotated-90');
       else if (rot === -90) frame.classList.add('rotated-minus90');
       else frame.classList.add('rotated-0');
+
+      if (ratioLocked) {
+        frame.classList.remove('landscape', 'portrait');
+        const isPortrait = (rot === 90 || rot === -90);
+        frame.classList.add(isPortrait ? 'portrait' : 'landscape');
+      }
     }
   } catch(e) { console.warn('Rotation fetch failed for', side, e); }
 }
@@ -407,6 +415,31 @@ function testTransition() {
   window.open(testUrl, '_blank');
 }
 window.testTransition = testTransition;
+
+window.toggleRatioLock = async function() {
+  ratioLocked = !ratioLocked;
+  const btn = document.getElementById('ratioLockBtn');
+  if (btn) {
+    btn.textContent = ratioLocked ? '🔒' : '🔓';
+    btn.title = ratioLocked ? 'Seitenverhältnis fixiert' : 'Seitenverhältnis fixieren';
+    btn.style.color = ratioLocked ? '#ff3366' : '';
+  }
+
+  ['left', 'right'].forEach(side => {
+    const frame = document.getElementById('frame' + (side === 'left' ? 'Left' : 'Right'));
+    if (!frame) return;
+    frame.classList.remove('locked', 'landscape', 'portrait');
+    if (ratioLocked) {
+      frame.classList.add('locked');
+      const rotText = document.getElementById('badge' + (side === 'left' ? 'Left' : 'Right'))?.textContent;
+      const isPortrait = rotText && rotText.includes('90');
+      frame.classList.add(isPortrait ? 'portrait' : 'landscape');
+    }
+  });
+
+  await updateTVPreviewRotation('left');
+  await updateTVPreviewRotation('right');
+}
 
 async function clearAllData() {
   if(!confirm('⚠️ WIRKLICH ALLES LÖSCHEN?\n\nAlle Slides, Gruppen und Bilder werden unwiderruflich gelöscht!')) return;
