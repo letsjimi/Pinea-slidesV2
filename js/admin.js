@@ -37,6 +37,8 @@ async function initApp(){
     await initDB(); dbReady=true;
     await loadGroups(); await loadSlides(); await loadConfig();
     setupFilters(); renderGroups(); renderSlides(); renderGroupPills(); updateFilterOptions();
+    const lastTab=localStorage.getItem('pineaAdminTab');
+    if(lastTab) activateTab(lastTab);
     import('./admin-timeline.js').then(m=>{ if(m.initTimelineEditor) m.initTimelineEditor(); timelineLoaded=true; }).catch(()=>{});
     console.log('PINEA Admin v4.1 ready');
   } catch(err) { toast('Fehler beim Starten: '+err.message,'error'); }
@@ -114,18 +116,24 @@ window.openTV = function(side) {
 };
 
 /* TABS */
+function activateTab(tab){
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
+  const btn=document.querySelector(`.tab-btn[data-tab="${tab}"]`);
+  const t=document.getElementById('tab-'+tab);
+  if(btn) btn.classList.add('active');
+  if(t) t.classList.add('active');
+  if(tab==='timeline'&&!timelineLoaded){
+    import('./admin-timeline.js').then(m=>{if(m.initTimelineEditor)m.initTimelineEditor(); timelineLoaded=true;}).catch(()=>{});
+  }
+}
 function setupTabs() {
-  document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', e => {
+  document.querySelectorAll('.tab-btn').forEach(btn=>{
+    btn.addEventListener('click',e=>{
       e.stopPropagation();
-      const tab = btn.dataset.tab; if(!tab) return;
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-      btn.classList.add('active');
-      const t = document.getElementById('tab-'+tab); if(t) t.classList.add('active');
-      if(tab==='timeline' && !timelineLoaded) {
-        import('./admin-timeline.js').then(m => { if(m.initTimelineEditor) m.initTimelineEditor(); timelineLoaded = true; }).catch(()=>{});
-      }
+      const tab=btn.dataset.tab; if(!tab) return;
+      localStorage.setItem('pineaAdminTab',tab);
+      activateTab(tab);
     });
   });
 }
