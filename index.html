@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=1280, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PINEA Slides — Admin</title>
   <link rel="stylesheet" href="css/app.css">
 </head>
@@ -111,16 +111,16 @@
         </div>
         <button class="btn btn-primary" onclick="updateMatrixFromSettings()">Anwenden</button>
       </div>
-      <div id="timelineWorkspace" style="display:grid;grid-template-columns:1fr 300px;gap:20px;align-items:start;">
+      <div id="timelineWorkspace" style="display:grid;grid-template-columns:1fr 300px;gap:20px;align-items:stretch;">
         <div id="timelineRows" style="overflow-x:auto;min-width:0;"></div>
-        <div class="card" style="position:sticky;top:80px;align-self:start;padding:14px;background:#1a1a20;">
+        <div class="card" style="position:sticky;top:80px;align-self:start;padding:14px;background:#1a1a20;height:100%;display:flex;flex-direction:column;">
           <h3>📦 Slide-Pool</h3>
           <div style="display:flex;gap:8px;margin-bottom:12px;">
             <button class="btn btn-ghost" style="font-size:12px;padding:6px 12px;" onclick="window.togglePoolSelectAll()" id="poolSelectAllBtn">☑️ Alle</button>
             <button class="btn btn-primary" style="font-size:12px;padding:6px 12px;" onclick="window.showBatchAddDialog()">➕ Auswahl hinzufügen</button>
           </div>
           <p style="color:#888;font-size:13px;margin-bottom:12px;">Bilder anhaken und in Zeile einfügen, oder direkt in Zeile ziehen.</p>
-          <div id="slidePool" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:8px;"></div>
+          <div id="slidePool" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:8px;overflow-y:auto;"></div>
           <div id="batchAddDialog" style="display:none;margin-top:12px;padding:12px;background:#14141a;border-radius:8px;border:1px solid #2a2a30;">
             <p style="font-size:13px;color:#888;margin-bottom:8px;">Zu welcher Zeile?</p>
             <select id="batchAddRowSelect" style="width:100%;margin-bottom:8px;"></select>
@@ -135,21 +135,6 @@
   <section id="tab-settings" class="tab-content">
     <div class="card">
       <h2>🎛️ Einstellungen</h2>
-      <div class="settings-group">
-        <h3 style="font-size:14px;font-weight:700;color:#fff;margin-bottom:14px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #2a2a30;padding-bottom:8px;">🎨 Grid-Einstellungen</h3>
-        <div class="form-row"><label>Grid sichtbar:</label><input type="checkbox" id="cfgGridVisible"></div>
-        <div class="form-row"><label>Grid-Farbe:</label><input type="color" id="cfgGridColor" value="#ff3366"></div>
-        <div class="form-row"><label>Grid-Opacity (%):</label><input type="number" id="cfgGridOpacity" min="0" max="100" step="5" value="40"></div>
-        <div class="form-row"><label>Grid-Strichstärke (px):</label><input type="number" id="cfgGridWidth" min="1" max="10" value="1"></div>
-        <div class="form-row"><label>Grid-Größe (Spalten × Reihen):</label>
-          <div style="display:flex;gap:8px;flex:1;">
-            <input type="number" id="cfgGridCols" value="2" min="1" max="16" style="width:70px;" placeholder="Spalten">
-            <span style="color:#888;font-size:16px;">×</span>
-            <input type="number" id="cfgGridRows" value="2" min="1" max="16" style="width:70px;" placeholder="Reihen">
-          </div>
-        </div>
-      </div>
-
       <div class="settings-group">
         <h3 style="font-size:14px;font-weight:700;color:#fff;margin-bottom:14px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #2a2a30;padding-bottom:8px;">🖼️ Anzeige-Einstellungen</h3>
         <div class="form-row"><label>Crop-Mode:</label>
@@ -224,7 +209,6 @@
       <div id="transitionSettings"></div>
       <div style="display:flex;gap:12px;margin-top:16px;">
         <button class="btn btn-primary" onclick="saveTransitionConfig()">💾 Übergang speichern</button>
-        <button class="btn btn-ghost" onclick="testTransition()">👁️ Testen</button>
       </div>
     </div>
   </section>
