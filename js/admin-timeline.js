@@ -12,6 +12,7 @@ let allSlides=[], layoutData={rows:3,cols:2,timelines:[[],[],[]],rowAnimationMod
 let dragSrc=null, currentTV='left';
 let poolSelection = new Set(); // Mehrfachauswahl im Pool
 let activeGroupFilter = null;  // Gruppenfilter im Pool
+let poolZoomScale = parseFloat(localStorage.getItem('timelinePoolZoom')) || 1.0;
 
 export async function initTimelineEditor() {
   console.log('[Timeline] initTimelineEditor() startet...');
@@ -90,6 +91,13 @@ function renderTVSelector() {
 function renderPool() {
   const pool=document.getElementById('slidePool'); if(!pool) { console.warn('[Timeline] slidePool nicht gefunden'); return; }
   pool.querySelectorAll('img[data-src]').forEach(img=>{ img.src=''; });
+  // Dynamische Grid-Spalten basierend auf Zoom
+  const minCol=Math.max(60,Math.round(100*poolZoomScale));
+  pool.style.gridTemplateColumns=`repeat(auto-fill,minmax(${minCol}px,1fr))`;
+  // Zoom-Anzeige updaten
+  const zoomEl=document.getElementById('poolZoomValue');
+  if(zoomEl) zoomEl.textContent=Math.round(poolZoomScale*100)+'%';
+
   renderPoolGroupFilter();
   console.log('[Timeline] renderPool() — allSlides:', allSlides.length, 'currentTV:', currentTV);
 
@@ -215,6 +223,15 @@ window.timelineDragStart=function(e,slideId){
   e.dataTransfer.setData('text/plain',JSON.stringify(dragSrc));
 };
 
+window.adjustPoolZoom=function(delta){
+  poolZoomScale=Math.max(0.4,Math.min(2.5,poolZoomScale+delta));
+  localStorage.setItem('timelinePoolZoom',poolZoomScale.toFixed(2));
+  const pct=Math.round(poolZoomScale*100);
+  const el=document.getElementById('poolZoomValue');
+  if(el) el.textContent=pct+'%';
+  renderPool();
+};
+
 /* ASPECT RATIO */
 function updateSlotAspectRatio(){
   const cols=layoutData.cols||2;
@@ -222,15 +239,14 @@ function updateSlotAspectRatio(){
   const rotation=layoutData.rotation||0;
   const isPortrait=Math.abs(rotation)===90;
   let arW,arH;
-  if(isPortrait){
-    arW=rows; arH=cols;
-  }else{
-    arW=cols; arH=rows;
-  }
-  const slotHeight=Math.round((200/arW)*arH);
-  document.documentElement.style.setProperty('--slot-width','200px');
+  if(isPortrait){ arW=rows; arH=cols; }else{ arW=cols; arH=rows; }
+  // Slot: fixed width 240px (~20% bigger than 200px), height from matrix ratio
+  const slotWidth=240;
+  const slotHeight=Math.round((slotWidth/arW)*arH);
+  document.documentElement.style.setProperty('--slot-width',slotWidth+'px');
   document.documentElement.style.setProperty('--slot-height',slotHeight+'px');
-  const poolWidth=100;
+  // Pool: base 100px * zoom scale
+  const poolWidth=Math.round(100*poolZoomScale);
   const poolHeight=Math.round((poolWidth/arW)*arH);
   document.documentElement.style.setProperty('--pool-width',poolWidth+'px');
   document.documentElement.style.setProperty('--pool-height',poolHeight+'px');

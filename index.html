@@ -111,17 +111,24 @@
         </div>
         <button class="btn btn-primary" onclick="updateMatrixFromSettings()">Anwenden</button>
       </div>
-      <div id="timelineWorkspace" style="display:grid;grid-template-columns:1fr 380px;gap:20px;align-items:stretch;">
+      <div id="timelineWorkspace" style="display:grid;grid-template-columns:1fr 540px;gap:20px;align-items:stretch;">
         <div id="timelineRows" style="overflow-x:auto;min-width:0;"></div>
         <div class="card" style="position:sticky;top:80px;align-self:start;padding:14px;background:#1a1a20;height:100%;display:flex;flex-direction:column;">
-          <h3>📦 Slide-Pool</h3>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+            <h3>📦 Slide-Pool</h3>
+            <div style="display:flex;gap:4px;align-items:center;background:#0f0f12;border-radius:8px;padding:2px;border:1px solid #2a2a30;">
+              <button class="btn btn-ghost" style="padding:4px 10px;font-size:16px;line-height:1;min-width:32px;" onclick="window.adjustPoolZoom(-0.2)" title="Verkleinern">−</button>
+              <span id="poolZoomValue" style="font-size:11px;color:#aaa;min-width:36px;text-align:center;font-variant-numeric:tabular-nums;">200%</span>
+              <button class="btn btn-ghost" style="padding:4px 10px;font-size:16px;line-height:1;min-width:32px;" onclick="window.adjustPoolZoom(0.2)" title="Vergrößern">+</button>
+            </div>
+          </div>
           <div style="display:flex;gap:8px;margin-bottom:12px;">
             <button class="btn btn-ghost" style="font-size:12px;padding:6px 12px;" onclick="window.togglePoolSelectAll()" id="poolSelectAllBtn">☑️ Alle</button>
             <button class="btn btn-primary" style="font-size:12px;padding:6px 12px;" onclick="window.showBatchAddDialog()">➕ Auswahl hinzufügen</button>
           </div>
           <div id="poolGroupFilter" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;min-height:24px;"></div>
           <p style="color:#888;font-size:13px;margin-bottom:12px;">Bilder anhaken und in Zeile einfügen, oder direkt in Zeile ziehen.</p>
-          <div id="slidePool" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:8px;overflow-y:auto;flex:1;min-height:0;"></div>
+          <div id="slidePool" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px;overflow-y:auto;flex:1;min-height:0;"></div>
           <div id="batchAddDialog" style="display:none;margin-top:12px;padding:12px;background:#14141a;border-radius:8px;border:1px solid #2a2a30;">
             <p style="font-size:13px;color:#888;margin-bottom:8px;">Zu welcher Zeile?</p>
             <select id="batchAddRowSelect" style="width:100%;margin-bottom:8px;"></select>
