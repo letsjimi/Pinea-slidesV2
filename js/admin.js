@@ -1,6 +1,7 @@
 // PINEA Admin v4.1 — Server Backend Tabs, Upload, Gruppen, Slides, Timeline, Settings
 import { db, initDB, DEFAULT_CONFIG } from './db.js';
 import * as api from './api.js';
+import * as timelineModule from './admin-timeline.js';
 
 let groups = [], slides = [], selectedUploadGroup = null, draggedSlide = null;
 let dbReady = false, timelineLoaded = false, currentTransition = 'fade';
@@ -231,6 +232,7 @@ async function handleFiles(files) {
   if(newSlides.length) await db.slides.bulkAdd(newSlides);
   zone.classList.remove('uploading'); const p=zone.querySelector('p'); if(p) p.textContent='Dateien hier reinziehen oder klicken';
   await loadSlides(); renderSlides(); renderGroupPills();
+  if(timelineModule.refreshPoolAndRows) await timelineModule.refreshPoolAndRows();
   toast(`${newSlides.length} Bilder hochgeladen`,'success');
 }
 window.handleFiles = handleFiles;
@@ -268,6 +270,7 @@ async function generateTestImages() {
   }
   if(newSlides.length) await db.slides.bulkAdd(newSlides);
   await loadSlides(); renderSlides();
+  if(timelineModule.refreshPoolAndRows) await timelineModule.refreshPoolAndRows();
   toast(`${newSlides.length} Testbilder generiert`,'success');
 }
 window.generateTestImages = generateTestImages;
@@ -304,7 +307,7 @@ function updateFilterOptions() {
 function slideDragStart(id){ draggedSlide=slides.find(s=>s.id===id); }
 async function slideDrop(e,dropIdx){ e.preventDefault(); if(!draggedSlide) return; const di=slides.findIndex(s=>s.id===draggedSlide.id); if(di===-1||di===dropIdx) return; const[moved]=slides.splice(di,1); slides.splice(dropIdx,0,moved); for(let i=0;i<slides.length;i++) await db.slides.update(slides[i].id,{sortOrder:i}); await loadSlides(); renderSlides(); toast('Reihenfolge aktualisiert','success'); }
 function slideDragEnd(){ draggedSlide=null; }
-async function deleteSlide(id){ if(!confirm('Löschen?')) return; await db.slides.delete(id); await loadSlides(); renderSlides(); toast('Gelöscht','success'); }
+async function deleteSlide(id){ if(!confirm('Löschen?')) return; await db.slides.delete(id); await loadSlides(); renderSlides(); if(timelineModule.refreshPoolAndRows) timelineModule.refreshPoolAndRows(); toast('Gelöscht','success'); }
 async function cycleTV(id){ const s=slides.find(x=>x.id===id); const nxt=s.tvAssignment==='both'?'left':s.tvAssignment==='left'?'right':'both'; await db.slides.update(id,{tvAssignment:nxt}); await loadSlides(); renderSlides(); toast(`TV: ${nxt}`,'info'); }
 window.slideDragStart=slideDragStart; window.slideDrop=slideDrop; window.slideDragEnd=slideDragEnd; window.deleteSlide=deleteSlide; window.cycleTV=cycleTV;
 

@@ -14,6 +14,12 @@ let poolSelection = new Set(); // Mehrfachauswahl im Pool
 let activeGroupFilter = null;  // Gruppenfilter im Pool
 let poolZoomScale = parseFloat(localStorage.getItem('timelinePoolZoom')) || 1.0;
 
+export async function refreshPoolAndRows(){
+  allSlides = await db.slides.toArray();
+  renderPool();
+  renderAllRows();
+}
+
 export async function initTimelineEditor() {
   console.log('[Timeline] initTimelineEditor() startet...');
   try {
@@ -143,7 +149,6 @@ function renderPoolGroupFilter() {
     const active=activeGroupFilter===name;
     return `<button class="group-pill ${active?'active':''}" style="background:${active?color:'#222'};color:#fff;border:1px solid ${active?color:'#333'};padding:4px 10px;border-radius:12px;font-size:11px;cursor:pointer;display:flex;align-items:center;gap:6px;" onclick="window.setPoolGroupFilter('${name}')">
       <span style="width:8px;height:8px;border-radius:50%;background:${color};"></span>${name}
-      <span onclick="event.stopPropagation(); window.deleteSlidesByGroup('${name}')" title="Gruppeninhalte löschen" style="margin-left:2px;font-size:14px;font-weight:bold;opacity:0.6;line-height:1;">×</span>
     </button>`;
   }).join('');
   const reset=activeGroupFilter?`<button class="group-pill" style="background:#333;color:#fff;border:1px solid #444;padding:4px 10px;border-radius:12px;font-size:11px;cursor:pointer;" onclick="window.setPoolGroupFilter(null)">✕ Filter löschen</button>`:'';
