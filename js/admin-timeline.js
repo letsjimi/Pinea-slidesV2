@@ -151,8 +151,7 @@ function renderPoolGroupFilter() {
       <span style="width:8px;height:8px;border-radius:50%;background:${color};"></span>${name}
     </button>`;
   }).join('');
-  const reset=activeGroupFilter?`<button class="group-pill" style="background:#333;color:#fff;border:1px solid #444;padding:4px 10px;border-radius:12px;font-size:11px;cursor:pointer;" onclick="window.setPoolGroupFilter(null)">✕ Filter löschen</button>`:'';
-  container.innerHTML=`<button class="group-pill ${!activeGroupFilter?'active':''}" style="background:${!activeGroupFilter?'#ff3366':'#222'};color:#fff;border:1px solid ${!activeGroupFilter?'#ff3366':'#333'};padding:4px 10px;border-radius:12px;font-size:11px;cursor:pointer;" onclick="window.setPoolGroupFilter(null)">Alle</button>`+pills+reset;
+  container.innerHTML=`<button class="group-pill ${!activeGroupFilter?'active':''}" style="background:${!activeGroupFilter?'#ff3366':'#222'};color:#fff;border:1px solid ${!activeGroupFilter?'#ff3366':'#333'};padding:4px 10px;border-radius:12px;font-size:11px;cursor:pointer;" onclick="window.setPoolGroupFilter(null)">Alle</button>`+pills;
 }
 
 window.setPoolGroupFilter=function(name){

@@ -408,3 +408,17 @@ function testTransition() {
 }
 window.testTransition = testTransition;
 
+async function clearAllData() {
+  if(!confirm('⚠️ WIRKLICH ALLES LÖSCHEN?\n\nAlle Slides, Gruppen und Bilder werden unwiderruflich gelöscht!')) return;
+  if(!confirm('ABSOLUT SICHER? Dies kann nicht rückgängig gemacht werden.')) return;
+  try {
+    await db.slides.clear();
+    await db.groups.clear();
+    slides=[]; groups=[]; selectedUploadGroup=null; selectedGroup='all';
+    await loadSlides(); renderSlides(); renderGroupPills(); renderGroupSelect();
+    if(timelineModule.refreshPoolAndRows) await timelineModule.refreshPoolAndRows();
+    toast('🗑️ Alle Daten gelöscht','success');
+  } catch(err){ toast('Fehler: '+err.message,'error'); }
+}
+window.clearAllData = clearAllData;
+

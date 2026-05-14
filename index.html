@@ -73,7 +73,7 @@
             <input type="text" id="newGroupName" placeholder="Neue Gruppe..." style="min-width:0;">
             <div style="display:flex;gap:8px;align-items:center;">
               <input type="color" id="newGroupColor" value="#ff3366" style="width:40px;height:32px;padding:2px;flex-shrink:0;">
-              <button class="btn btn-primary" onclick="addGroup()" style="flex:1;font-size:12px;padding:8px;box-sizing:border-box;">+ Hinzufügen</button>
+              <button class="btn btn-primary" onclick="addGroup()" style="flex:1;min-width:0;font-size:12px;padding:8px;box-sizing:border-box;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">+ Hinzufügen</button>
             </div>
           </div>
         </div>
@@ -168,6 +168,12 @@
       </div>
 
       <button class="btn btn-primary" onclick="saveConfig()" style="margin-top:12px;">💾 Speichern</button>
+    </div>
+
+    <div class="card" style="margin-top:20px;border-color:#5a3030;">
+      <h2 style="color:#e55;">⚠️ Gefahrenzone</h2>
+      <p style="color:#aaa;font-size:13px;margin-bottom:14px;">Hiermit werden ALLE Slides, Gruppen und hochgeladenen Bilder unwiderruflich gelöscht.</p>
+      <button class="btn" onclick="clearAllData()" style="background:#a22;color:#fff;border-color:#a22;">💥 Alles löschen</button>
     </div>
   </section>
 
