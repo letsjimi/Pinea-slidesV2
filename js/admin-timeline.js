@@ -11,6 +11,7 @@ function hasImage(s){ return !!(s.imageUrl || s.imageFilename); }
 let allSlides=[], layoutData={rows:3,cols:2,timelines:[[],[],[]],rowAnimationModes:['cell','cell','cell'],rowSteps:[1,1,1],stripSteps:[1,1,1],cellGap:4,useMatrix:true};
 let dragSrc=null, currentTV='left';
 let poolSelection = new Set(); // Mehrfachauswahl im Pool
+let activeGroupFilter = null;  // Gruppenfilter im Pool
 
 export async function initTimelineEditor() {
   console.log('[Timeline] initTimelineEditor() startet...');
@@ -89,18 +90,20 @@ function renderTVSelector() {
 function renderPool() {
   const pool=document.getElementById('slidePool'); if(!pool) { console.warn('[Timeline] slidePool nicht gefunden'); return; }
   pool.querySelectorAll('img[data-src]').forEach(img=>{ img.src=''; });
+  renderPoolGroupFilter();
   console.log('[Timeline] renderPool() — allSlides:', allSlides.length, 'currentTV:', currentTV);
 
   const tvSlides=allSlides.filter(s=>{
     const tvMatch = s.tvAssignment===currentTV || s.tvAssignment==='both';
-    return hasImage(s) && tvMatch;
+    const groupMatch = !activeGroupFilter || s.groupName === activeGroupFilter;
+    return hasImage(s) && tvMatch && groupMatch;
   });
   console.log('[Timeline] renderPool() — tvSlides (gefiltert):', tvSlides.length);
 
   if(!tvSlides.length){
     console.log('[Timeline] Keine Bilder für', currentTV);
     pool.innerHTML=`<div style="grid-column:1/-1;text-align:center;padding:20px;color:#555;font-size:14px;">
-      🚫 Keine Bilder für diesen TV.\n<br><br>
+      🚫 Keine Bilder für diesen TV.${activeGroupFilter?' (Gruppe: '+activeGroupFilter+')':''}\n<br><br>
       Lösung:\n<br>
       1. Gehe zum <strong>Slides</strong>-Tab\n<br>
       2. Erstelle Testbilder oder lade Bilder hoch\n<br>
@@ -122,6 +125,26 @@ function renderPool() {
   }).join('');
   console.log('[Timeline] renderPool() fertig —', tvSlides.length, 'Bilder gerendert');
 }
+
+function renderPoolGroupFilter() {
+  const container=document.getElementById('poolGroupFilter'); if(!container) return;
+  const groupsMap=new Map();
+  allSlides.forEach(s=>{ if(s.groupName && s.groupName!=='—') groupsMap.set(s.groupName, s.groupColor||'#555'); });
+  if(!groupsMap.size){ container.innerHTML=''; return; }
+  const pills=Array.from(groupsMap.entries()).map(([name,color])=>{
+    const active=activeGroupFilter===name;
+    return `<button class="group-pill ${active?'active':''}" style="background:${active?color:'#222'};color:#fff;border:1px solid ${active?color:'#333'};padding:4px 10px;border-radius:12px;font-size:11px;cursor:pointer;display:flex;align-items:center;gap:6px;" onclick="window.setPoolGroupFilter('${name}')">
+      <span style="width:8px;height:8px;border-radius:50%;background:${color};"></span>${name}
+    </button>`;
+  }).join('');
+  const reset=activeGroupFilter?`<button class="group-pill" style="background:#333;color:#fff;border:1px solid #444;padding:4px 10px;border-radius:12px;font-size:11px;cursor:pointer;" onclick="window.setPoolGroupFilter(null)">✕ Filter löschen</button>`:'';
+  container.innerHTML=`<button class="group-pill ${!activeGroupFilter?'active':''}" style="background:${!activeGroupFilter?'#ff3366':'#222'};color:#fff;border:1px solid ${!activeGroupFilter?'#ff3366':'#333'};padding:4px 10px;border-radius:12px;font-size:11px;cursor:pointer;" onclick="window.setPoolGroupFilter(null)">Alle</button>`+pills+reset;
+}
+
+window.setPoolGroupFilter=function(name){
+  activeGroupFilter=name;
+  renderPool();
+};
 
 /* POOL SELECTION */
 window.togglePoolSelection=function(e,slideId){
@@ -204,7 +227,9 @@ function renderAllRows() {
     const step=(mode==='strip'?(stripSteps?.[ri]):(rowSteps?.[ri]))||1;
     return `<div class="timeline-row ${has?'has-content':'empty'}">
       <div class="row-header"><div class="row-info"><span class="row-num">Zeile ${ri+1}</span><span class="row-count">${ids.length} Bilder</span></div>
-      <button class="btn btn-ghost" onclick="window.clearRow(${ri})" title="Leeren">🗑️</button></div>
+      <div style="display:flex;gap:6px;align-items:center;">
+      ${has?`<button class="btn btn-ghost" style="padding:6px 10px;font-size:12px;" onclick="window.scrollRow(${ri},-1)" title="Links scrollen">◀</button><button class="btn btn-ghost" style="padding:6px 10px;font-size:12px;" onclick="window.scrollRow(${ri},1)" title="Rechts scrollen">▶</button>`:''}
+      <button class="btn btn-ghost" style="padding:6px 10px;font-size:12px;" onclick="window.clearRow(${ri})" title="Leeren">🗑️</button></div></div>
       <div class="row-controls" style="display:flex;gap:12px;flex-wrap:wrap;padding:8px 12px;background:#14141a;border-radius:8px;margin-bottom:8px;align-items:center;">
         <div class="form-row" style="margin:0;"><label>Modus:</label>
           <select onchange="window.updateRowMode(${ri},this.value)" style="width:140px;">
