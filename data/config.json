@@ -10,7 +10,7 @@
   "transitionType": "slide",
   "transitionSettings": {
     "duration": 1200,
-    "easing": "linear",
+    "easing": "ease-out",
     "direction": "left"
   },
   "showGroupLabel": true,
@@ -20,5 +20,5 @@
   "debugOverlay": false,
   "autoStart": true,
   "idleTimeout": 0,
-  "slideshowSpeed": 10000
+  "slideshowSpeed": 20000
 }
