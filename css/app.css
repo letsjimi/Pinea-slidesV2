@@ -43,10 +43,10 @@ body.tv-rotated .tv-container{position:fixed;}
 
 .timeline-pool-item.selected{border-color:#ff3366!important;box-shadow:0 0 0 2px #ff3366}
 
-#timelineWorkspace{height:calc(100vh - 200px);min-height:500px}
+#timelineWorkspace{min-height:500px}
 #timelineWorkspace.resizable>.card:last-child{resize:horizontal;overflow:auto;min-width:240px;max-width:50vw}
 
-#timelineRows{display:flex;flex-direction:column;gap:16px;min-width:0;overflow-y:auto;height:100%}
+#timelineRows{display:flex;flex-direction:column;gap:16px;min-width:0}
 .timeline-row{min-width:0}
 .row-strip{display:flex;gap:10px;overflow-x:auto;padding:12px;min-height:auto;background:#0f0f12;border-radius:10px;border:2px dashed #2a2a30;transition:all .3s}
 

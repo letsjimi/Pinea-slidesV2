@@ -200,14 +200,11 @@ function renderAllRows() {
   if(!rows){ c.innerHTML=`<div style="text-align:center;padding:30px;color:#555;">Reihen > 0 einstellen.</div>`; return; }
   c.innerHTML=Array.from({length:rows},(_,ri)=>{
     const ids=timelines[ri]||[]; const has=ids.length>0;
-    const fill=Math.min(100,(ids.length/(layoutData.cols||2))*100);
     const mode=(rowAnimationModes?.[ri])||'cell';
     const step=(mode==='strip'?(stripSteps?.[ri]):(rowSteps?.[ri]))||1;
     return `<div class="timeline-row ${has?'has-content':'empty'}">
       <div class="row-header"><div class="row-info"><span class="row-num">Zeile ${ri+1}</span><span class="row-count">${ids.length} Bilder</span></div>
-      <div class="row-fill-bar"><div class="row-fill-track"><div class="row-fill-progress" style="width:${fill}%"></div></div>
-      ${has?`<button class="btn btn-ghost" onclick="window.scrollRow(${ri},-1)">◀</button><button class="btn btn-ghost" onclick="window.scrollRow(${ri},1)">▶</button>`:''}
-      <button class="btn btn-ghost" onclick="window.clearRow(${ri})" title="Leeren">🗑️</button></div></div>
+      <button class="btn btn-ghost" onclick="window.clearRow(${ri})" title="Leeren">🗑️</button></div>
       <div class="row-controls" style="display:flex;gap:12px;flex-wrap:wrap;padding:8px 12px;background:#14141a;border-radius:8px;margin-bottom:8px;align-items:center;">
         <div class="form-row" style="margin:0;"><label>Modus:</label>
           <select onchange="window.updateRowMode(${ri},this.value)" style="width:140px;">

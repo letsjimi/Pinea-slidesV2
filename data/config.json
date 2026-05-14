@@ -3,7 +3,7 @@
   "gridColor": "#ff3366",
   "gridVisible": false,
   "gridOpacity": 0.4,
-  "gridWidthPx": 1,
+  "gridWidthPx": 4,
   "gridCols": 2,
   "gridRows": 3,
   "cropMode": "cover",
