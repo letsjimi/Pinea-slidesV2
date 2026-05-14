@@ -60,7 +60,7 @@
       4000
     ],
     "cellGap": 4,
-    "rotation": 0
+    "rotation": -90
   },
   "right": {
     "tvId": "right",

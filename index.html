@@ -216,43 +216,48 @@
   <!-- TAB: LINKS -->
   <section id="tab-links" class="tab-content">
     <div class="card">
-      <h2>🔗 TV-Links &amp; Live-Preview</h2>
-      <p style="color:#888;font-size:13px;margin-bottom:16px;">
-        Direkte Links zum Öffnen in neuen Tabs. Preview zeigt aktuellen Stand (wenn TVs aktiv).
-      </p>
+      <h2 style="margin-bottom:4px;">🔗 TV-Links &amp; Live-Preview</h2>
+      <p style="color:#888;font-size:13px;margin-bottom:20px;">Direkte Links und Live-Preview der TV-Ansichten. Rotation wird automatisch aus den Timeline-Einstellungen übernommen.</p>
 
-      <div class="link-box">
-        <strong>🎛️ Admin-Panel</strong> <br>
+      <div class="tv-preview-grid">
+        <div class="tv-preview-card">
+          <div class="tv-preview-header">
+            <h3>📺 TV Links</h3>
+            <span class="tv-rotation-badge" id="badgeLeft">0°</span>
+          </div>
+          <div class="tv-frame" id="frameLeft">
+            <iframe id="previewLeft" src="" title="TV Links Preview"></iframe>
+          </div>
+          <div class="tv-actions">
+            <button class="btn btn-primary" onclick="openTV('left')" style="flex:1;justify-content:center;">▶ Öffnen</button>
+            <button class="btn btn-ghost" onclick="refreshPreview('left')" style="flex:1;justify-content:center;">🔄 Neu laden</button>
+          </div>
+          <div class="tv-link-box">
+            <a id="linkLeftA" href="#" target="_blank">–</a>
+          </div>
+        </div>
+
+        <div class="tv-preview-card">
+          <div class="tv-preview-header">
+            <h3>📺 TV Rechts</h3>
+            <span class="tv-rotation-badge" id="badgeRight">0°</span>
+          </div>
+          <div class="tv-frame" id="frameRight">
+            <iframe id="previewRight" src="" title="TV Rechts Preview"></iframe>
+          </div>
+          <div class="tv-actions">
+            <button class="btn btn-primary" onclick="openTV('right')" style="flex:1;justify-content:center;">▶ Öffnen</button>
+            <button class="btn btn-ghost" onclick="refreshPreview('right')" style="flex:1;justify-content:center;">🔄 Neu laden</button>
+          </div>
+          <div class="tv-link-box">
+            <a id="linkRightA" href="#" target="_blank">–</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="link-box" style="margin-top:20px;">
+        <strong>🎛️ Admin-Panel</strong><br>
         <a id="linkAdminA" href="#" target="_blank">–</a>
-      </div>
-
-      <div class="link-box">
-        <strong>📺 TV Links</strong> <br>
-        <a id="linkLeftA" href="#" target="_blank">–</a>
-      </div>
-
-      <div class="link-box">
-        <strong>📺 TV Rechts</strong> <br>
-        <a id="linkRightA" href="#" target="_blank">–</a>
-      </div>
-
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:24px;">
-        <div class="card" style="padding:12px;">
-          <h3>📺 TV Links — Live Preview</h3>
-          <iframe id="previewLeft" src="" style="width:100%;aspect-ratio:9/16;border:none;border-radius:8px;background:#000;"></iframe>
-          <div style="display:flex;gap:8px;margin-top:10px;">
-            <button class="btn btn-primary" onclick="openTV('left')" style="flex:1;">▶ Öffnen</button>
-            <button class="btn btn-ghost" onclick="refreshPreview('left')" style="flex:1;">🔄 Neu laden</button>
-          </div>
-        </div>
-        <div class="card" style="padding:12px;">
-          <h3>📺 TV Rechts — Live Preview</h3>
-          <iframe id="previewRight" src="" style="width:100%;aspect-ratio:9/16;border:none;border-radius:8px;background:#000;"></iframe>
-          <div style="display:flex;gap:8px;margin-top:10px;">
-            <button class="btn btn-primary" onclick="openTV('right')" style="flex:1;">▶ Öffnen</button>
-            <button class="btn btn-ghost" onclick="refreshPreview('right')" style="flex:1;">🔄 Neu laden</button>
-          </div>
-        </div>
       </div>
     </div>
   </section>

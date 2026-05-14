@@ -180,6 +180,24 @@ body.tv-rotated .tv-container{position:fixed;}
 .link-box a{color:#ff3366;text-decoration:none;font-weight:600}
 .link-box a:hover{text-decoration:underline}
 
+.tv-preview-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.tv-preview-card{background:#14141a;border:1px solid #2a2a30;border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.tv-preview-header{display:flex;align-items:center;justify-content:space-between}
+.tv-preview-header h3{margin:0;font-size:14px;color:#fff}
+.tv-rotation-badge{background:#222;color:#ff3366;font-size:12px;font-weight:700;padding:4px 10px;border-radius:6px;border:1px solid #333}
+.tv-frame{background:#000;border-radius:8px;overflow:hidden;position:relative;aspect-ratio:9/16;display:flex;align-items:center;justify-content:center}
+.tv-frame iframe{width:100%;height:100%;border:none;display:block}
+.tv-frame.rotated-90,.tv-frame.rotated-minus90{width:100%;padding-top:177.78%}
+.tv-frame.rotated-90 iframe,.tv-frame.rotated-minus90 iframe{position:absolute;inset:0;width:100%;height:100%}
+.tv-actions{display:flex;gap:8px}
+.tv-link-box{background:#0a0a0f;border:1px solid #222;border-radius:6px;padding:10px 12px}
+.tv-link-box a{color:#888;font-size:12px;font-family:monospace;word-break:break-all}
+.tv-link-box a:hover{color:#ff3366}
+
+@media(max-width:900px){
+  .tv-preview-grid{grid-template-columns:1fr}
+}
+
 .row-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
 .row-header h2{margin:0}
 

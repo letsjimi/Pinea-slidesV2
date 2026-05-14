@@ -78,6 +78,24 @@ function renderIPLinks() {
   const pr = document.getElementById('previewRight');
   if (pl) pl.src = urls[1];
   if (pr) pr.src = urls[2];
+  updateTVPreviewRotation('left');
+  updateTVPreviewRotation('right');
+}
+
+async function updateTVPreviewRotation(side) {
+  try {
+    const layout = await api.getLayout(side);
+    const rot = layout?.rotation || 0;
+    const badge = document.getElementById('badge' + (side === 'left' ? 'Left' : 'Right'));
+    const frame = document.getElementById('frame' + (side === 'left' ? 'Left' : 'Right'));
+    if (badge) badge.textContent = (rot > 0 ? '+' : '') + rot + '°';
+    if (frame) {
+      frame.classList.remove('rotated-0', 'rotated-90', 'rotated-minus90');
+      if (rot === 90) frame.classList.add('rotated-90');
+      else if (rot === -90) frame.classList.add('rotated-minus90');
+      else frame.classList.add('rotated-0');
+    }
+  } catch(e) { console.warn('Rotation fetch failed for', side, e); }
 }
 
 function getTVBase(side) {
@@ -366,9 +384,11 @@ async function saveTransitionConfig() {
 window.pineaLogout=function(){ api.logout(); window.location.reload(); };
 window.saveTransitionConfig = saveTransitionConfig;
 
-window.refreshPreview = function(side) {
+window.refreshPreview = async function(side) {
     const iframe = document.getElementById(side === 'left' ? 'previewLeft' : 'previewRight');
-    if(iframe) iframe.src = iframe.src;
+    if(!iframe) return;
+    iframe.src = iframe.src.split('?')[0] + '?t=' + Date.now();
+    await updateTVPreviewRotation(side);
 };
 
 function testTransition() {
