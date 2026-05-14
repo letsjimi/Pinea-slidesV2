@@ -143,6 +143,7 @@ function renderPoolGroupFilter() {
     const active=activeGroupFilter===name;
     return `<button class="group-pill ${active?'active':''}" style="background:${active?color:'#222'};color:#fff;border:1px solid ${active?color:'#333'};padding:4px 10px;border-radius:12px;font-size:11px;cursor:pointer;display:flex;align-items:center;gap:6px;" onclick="window.setPoolGroupFilter('${name}')">
       <span style="width:8px;height:8px;border-radius:50%;background:${color};"></span>${name}
+      <span onclick="event.stopPropagation(); window.deleteSlidesByGroup('${name}')" title="Gruppeninhalte löschen" style="margin-left:2px;font-size:14px;font-weight:bold;opacity:0.6;line-height:1;">×</span>
     </button>`;
   }).join('');
   const reset=activeGroupFilter?`<button class="group-pill" style="background:#333;color:#fff;border:1px solid #444;padding:4px 10px;border-radius:12px;font-size:11px;cursor:pointer;" onclick="window.setPoolGroupFilter(null)">✕ Filter löschen</button>`:'';
@@ -152,6 +153,27 @@ function renderPoolGroupFilter() {
 window.setPoolGroupFilter=function(name){
   activeGroupFilter=name;
   renderPool();
+};
+
+/* DELETE ALL SLIDES IN A GROUP */
+window.deleteSlidesByGroup=async function(groupName){
+  if(!groupName) return;
+  const slideIds=allSlides.filter(s=>s.groupName===groupName).map(s=>s.id);
+  if(!slideIds.length){ toast('Keine Slides in dieser Gruppe','info'); return; }
+  if(!confirm(`Alle ${slideIds.length} Slide(s) der Gruppe "${groupName}" löschen? Die Gruppe bleibt erhalten.`)) return;
+  try {
+    for(const id of slideIds){
+      await db.slides.delete(id);
+    }
+    toast(`${slideIds.length} Slide(s) gelöscht`);
+    allSlides=await db.slides.toArray();
+    renderPoolGroupFilter();
+    renderPool();
+    renderAllRows();
+  }catch(e){
+    console.error(e);
+    toast('Fehler beim Löschen','error');
+  }
 };
 
 /* POOL SELECTION */
