@@ -12,7 +12,7 @@
 <div id="loginOverlay" style="display:none;position:fixed;inset:0;z-index:9999;background:#0a0a0f;display:flex;align-items:center;justify-content:center;">
   <div style="width:360px;padding:32px;background:#14141a;border-radius:16px;border:1px solid #222;box-shadow:0 20px 60px rgba(0,0,0,.6);">
     <h2 style="text-align:center;margin:0 0 8px;color:#fff;font-size:24px;">🖼️ PINEA Slides</h2>
-    <p style="text-align:center;color:#888;font-size:13px;margin:0 0 24px;">v4.1 — Server Backend</p>
+    <p style="text-align:center;color:#888;font-size:13px;margin:0 0 24px;">v6.1 — Server Backend</p>
     <form id="loginForm" style="display:flex;flex-direction:column;gap:12px;">
       <input id="loginUser" type="text" placeholder="Benutzername" required autocomplete="username" style="padding:12px 14px;border-radius:10px;border:1px solid #2a2a30;background:#0c0c0f;color:#fff;font-size:14px;">
       <input id="loginPass" type="password" placeholder="Passwort" required autocomplete="current-password" style="padding:12px 14px;border-radius:10px;border:1px solid #2a2a30;background:#0c0c0f;color:#fff;font-size:14px;">
@@ -23,7 +23,7 @@
 </div>
 
 <header class="topbar">
-  <h1>🖼️ PINEA Slides <span style="font-weight:400;color:#ff3366">v4.1</span></h1>
+  <h1>🖼️ PINEA Slides <span style="font-weight:400;color:#ff3366">v6.1</span></h1>
   <span class="spacer"></span>
   <span id="ipBadge" style="font-size:13px;color:#888;background:#14141a;padding:6px 14px;border-radius:8px;border:1px solid #2a2a30;">📡 localhost:3000</span>
   <button class="btn btn-ghost" onclick="window.pineaLogout()" title="Abmelden">🚪 Logout</button>
@@ -110,7 +110,7 @@
       <div id="timelineControls" style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:20px;">
         <div class="form-row" style="margin:0;"><label>Reihen:</label><input type="number" id="matrixRows" value="3" min="1" max="8" style="width:80px;"></div>
         <div class="form-row" style="margin:0;"><label>Spalten:</label><input type="number" id="matrixCols" value="2" min="1" max="8" style="width:80px;"></div>
-        <div class="form-row" style="margin:0;"><label>Lücke (px):</label><input type="number" id="cellGap" value="4" min="0" max="50" style="width:80px;"></div>
+        <div class="form-row" style="margin:0;"><label>Lücke-Reihe (px):</label><input type="number" id="cellGap" value="4" min="0" max="50" style="width:80px;"></div>
         <div class="form-row" style="margin:0;"><label>TV-Rotation:</label>
           <select id="tvRotation">
             <option value="0">0° (Normal)</option>
@@ -166,6 +166,8 @@
       <div class="settings-group">
         <h3 style="font-size:14px;font-weight:700;color:#fff;margin-bottom:14px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #2a2a30;padding-bottom:8px;">🔧 System</h3>
         <div class="form-row"><label>Debug-Overlay (Strg+D):</label><input type="checkbox" id="cfgDebug"></div>
+        <div class="form-row"><label>TV-Update-Intervall:</label><input type="text" id="cfgRefreshInterval" value="2m" placeholder="z.B. 30s, 2m, 5h" style="width:120px;"></div>
+        <p style="color:#888;font-size:12px;margin:0;">Format: 1s ... 24h (z.B. 15s, 2m, 1h)</p>
       </div>
 
       <button class="btn btn-primary" onclick="saveConfig()" style="margin-top:12px;">💾 Speichern</button>

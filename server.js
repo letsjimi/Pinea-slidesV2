@@ -42,8 +42,12 @@ function initData(){
     gridWidthPx:1, gridCols:2, gridRows:2, cropMode:'cover', transitionType:'fade',
     transitionSettings:{duration:1200,easing:'ease-in-out'}, showGroupLabel:true,
     groupLabelPos:'bottom', labelColor:'#ffffff', labelBgOpacity:0.6,
-    debugOverlay:false, autoStart:true, idleTimeout:0, slideshowSpeed:5000
+    debugOverlay:false, autoStart:true, idleTimeout:0, slideshowSpeed:5000, refreshInterval:'2m', lastModified:Date.now()
   });
+  else {
+    const cfg=loadJSON(CONFIG_FILE);
+    if(cfg.lastModified===undefined){ cfg.lastModified=Date.now(); saveJSON(CONFIG_FILE,cfg); }
+  }
   if(!fs.existsSync(LAYOUTS_FILE)) saveJSON(LAYOUTS_FILE, {
     left:{tvId:'left',rows:3,cols:2,timelines:[[],[],[]],rowLabels:['','',''],rowAnimationModes:['cell','cell','cell'],rowSteps:[1,1,1],stripSteps:[1,1,1],rowCellGaps:[4,4,4],rowOffsets:[0,2000,4000]},
     right:{tvId:'right',rows:3,cols:2,timelines:[[],[],[]],rowLabels:['','',''],rowAnimationModes:['cell','cell','cell'],rowSteps:[1,1,1],stripSteps:[1,1,1],rowCellGaps:[4,4,4],rowOffsets:[0,2000,4000]}
@@ -124,6 +128,11 @@ function setupPublicAPI(app){
     if(!s) return res.status(404).json({error:'Not found'});
     res.json({slide:s});
   });
+  app.get('/api/check-update', (req,res)=>{
+    const cfg=loadJSON(CONFIG_FILE);
+    const since=parseInt(req.query.since)||0;
+    res.json({changed: (cfg.lastModified||0) > since, lastModified: cfg.lastModified||0});
+  });
   app.get('/api/groups', (req,res)=>res.json(loadJSON(GROUPS_FILE,[])));
   app.get('/api/images/:name', (req,res)=>{
     const p=path.join(IMG_DIR, path.basename(req.params.name));
@@ -154,43 +163,53 @@ function setupAdminAPI(app){
   });
   app.put('/api/config', authMW, (req,res)=>{
     const merged={...loadJSON(CONFIG_FILE),...req.body,id:'global'}; saveJSON(CONFIG_FILE,merged); res.json(merged);
+    bumpLastModified();
   });
   app.put('/api/layouts/:tvId', authMW, (req,res)=>{
     const all=loadJSON(LAYOUTS_FILE); all[req.params.tvId]={...req.body,tvId:req.params.tvId}; saveJSON(LAYOUTS_FILE,all); res.json(all[req.params.tvId]);
+    bumpLastModified();
   });
   app.post('/api/slides', authMW, (req,res)=>{
     const slides=loadJSON(SLIDES_FILE,[]); const s=req.body; if(!s.id) s.id=Date.now()+Math.floor(Math.random()*1000); slides.push(s); saveJSON(SLIDES_FILE,slides); res.json(s);
+    bumpLastModified();
   });
   app.put('/api/slides/:id', authMW, (req,res)=>{
     let slides=loadJSON(SLIDES_FILE,[]); const idx=slides.findIndex(x=>x.id==req.params.id); if(idx<0) return res.status(404).json({error:'Not found'});
     slides[idx]={...slides[idx],...req.body,id:Number(req.params.id)}; saveJSON(SLIDES_FILE,slides); res.json(slides[idx]);
+    bumpLastModified();
   });
   app.delete('/api/slides/:id', authMW, (req,res)=>{
     let slides=loadJSON(SLIDES_FILE,[]); const slide=slides.find(x=>x.id==req.params.id);
     slides=slides.filter(x=>x.id!=req.params.id); saveJSON(SLIDES_FILE,slides);
     if(slide?.imageFilename){ try{fs.unlinkSync(path.join(IMG_DIR,slide.imageFilename));}catch(e){} }
     res.json({ok:true});
+    bumpLastModified();
   });
   app.post('/api/slides/bulk', authMW, (req,res)=>{
     const slides=loadJSON(SLIDES_FILE,[]); const incoming=req.body.slides||[]; incoming.forEach(s=>{if(!s.id) s.id=Date.now()+Math.floor(Math.random()*1000); slides.push(s);}); saveJSON(SLIDES_FILE,slides); res.json({ok:true,count:incoming.length});
+    bumpLastModified();
   });
   app.post('/api/groups', authMW, (req,res)=>{
     const groups=loadJSON(GROUPS_FILE,[]); const g=req.body; if(!g.id) g.id=Date.now()+Math.floor(Math.random()*1000); groups.push(g); saveJSON(GROUPS_FILE,groups); res.json(g);
+    bumpLastModified();
   });
   app.put('/api/groups/:id', authMW, (req,res)=>{
     let groups=loadJSON(GROUPS_FILE,[]); const idx=groups.findIndex(x=>x.id==req.params.id); if(idx<0) return res.status(404).json({error:'Not found'});
     groups[idx]={...groups[idx],...req.body,id:Number(req.params.id)}; saveJSON(GROUPS_FILE,groups); res.json(groups[idx]);
+    bumpLastModified();
   });
   app.delete('/api/groups/:id', authMW, (req,res)=>{
     let groups=loadJSON(GROUPS_FILE,[]); groups=groups.filter(x=>x.id!=req.params.id); saveJSON(GROUPS_FILE,groups); res.json({ok:true});
+    bumpLastModified();
   });
   app.post('/api/upload', authMW, upload.array('images',50), (req,res)=>{
     const files=(req.files||[]).map(f=>({filename:f.filename, originalName:f.originalname, url:'/api/images/'+f.filename}));
     res.json({files});
+    bumpLastModified();
   });
 }
 
-/* ===== ERROR HANDLER ===== */
+function bumpLastModified(){ const cfg=loadJSON(CONFIG_FILE); cfg.lastModified=Date.now(); saveJSON(CONFIG_FILE,cfg); }
 function setupErrorHandler(app){
   app.use((err,req,res,next)=>{
     if(err instanceof multer.MulterError){

@@ -1,4 +1,4 @@
-// PINEA TV Engine v4.1 — Server Backend Ready
+// PINEA TV Engine v6.1 — Server Backend Ready
 import { db, initDB, DEFAULT_CONFIG } from './db.js';
 
 let config={}, transCfg={}, layout=null, tvSide=null;
@@ -18,6 +18,7 @@ export async function initTV(tv) {
   applyConfig(); await render();
   if(config.idleTimeout>0) setupIdle();
   window.addEventListener('keydown', e=>{ if(e.key==='d' && e.ctrlKey){ e.preventDefault(); toggleDebug(); }});
+  startPolling();
 }
 
 function applyConfig() {
@@ -162,7 +163,7 @@ function renderMatrix() {
         for(const info of blockCells){
           totalCellIdx++;
           const isLastCell=totalCellIdx===totalCells;
-          const padRight=isLastCell?0:rowGap;
+          const padRight=(isLastCell||info.effectiveSpan>=cols)?0:rowGap;
           const wPct=(info.effectiveSpan / cols) * 100;
           const cell=document.createElement('div');
           cell.className='tv-strip-cell';
@@ -506,6 +507,37 @@ function setupIdle(){
 function toggleDebug(){
   const ov=document.getElementById('debugOverlay');
   if(ov) ov.classList.toggle('visible');
+}
+
+/* POLLING */
+let pollTimer=null, lastKnownModified=0;
+function parseInterval(str){
+  str=(str||'2m').trim().toLowerCase();
+  const m=str.match(/^(\d+(?:\.\d+)?)\s*([smhd])?$/);
+  if(!m) return 120000;
+  const n=parseFloat(m[1]);
+  const u=m[2]||'m';
+  const ms={s:1000,m:60000,h:3600000,d:86400000}[u]||60000;
+  return Math.max(1000, Math.min(86400000, Math.round(n*ms)));
+}
+async function startPolling(){
+  if(pollTimer){ clearInterval(pollTimer); pollTimer=null; }
+  const cfg=await db.config.get('global')||DEFAULT_CONFIG;
+  const iv=parseInterval(cfg.refreshInterval);
+  lastKnownModified=cfg.lastModified||0;
+  console.log('[TV] Polling Intervall:',cfg.refreshInterval,'=',iv,'ms');
+  pollTimer=setInterval(async()=>{
+    try{
+      const r=await fetch(`/api/check-update?since=${lastKnownModified}`);
+      if(!r.ok){ console.warn('[TV] check-update HTTP',r.status); return; }
+      const j=await r.json();
+      if(j.changed){
+        lastKnownModified=j.lastModified||Date.now();
+        console.log('[TV] Daten geändert → reload');
+        window.location.reload();
+      }
+    }catch(e){ console.error('[TV] poll error:',e); }
+  }, iv);
 }
 
 window.refreshSlides=render;

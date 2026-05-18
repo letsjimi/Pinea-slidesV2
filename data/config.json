@@ -3,9 +3,9 @@
   "gridColor": "#ff3366",
   "gridVisible": false,
   "gridOpacity": 0.4,
-  "gridWidthPx": 4,
-  "gridCols": 2,
-  "gridRows": 3,
+  "gridWidthPx": null,
+  "gridCols": null,
+  "gridRows": null,
   "cropMode": "cover",
   "transitionType": "slide",
   "transitionSettings": {
@@ -16,8 +16,10 @@
   "groupLabelPos": "bottom",
   "labelColor": "#ffffff",
   "labelBgOpacity": 0.6,
-  "debugOverlay": false,
+  "debugOverlay": true,
   "autoStart": true,
   "idleTimeout": 0,
-  "slideshowSpeed": 5000
+  "slideshowSpeed": 2000,
+  "refreshInterval": "1m",
+  "lastModified": 1778755200000
 }

@@ -84,7 +84,7 @@ export const DEFAULT_CONFIG = {
     gridWidthPx:1, gridCols:2, gridRows:2, cropMode:'cover', transitionType:'fade',
     transitionSettings:{duration:1200,easing:'ease-in-out'}, showGroupLabel:true,
     groupLabelPos:'bottom', labelColor:'#ffffff', labelBgOpacity:0.6,
-    debugOverlay:false, autoStart:true, idleTimeout:0, slideshowSpeed:5000
+    debugOverlay:false, autoStart:true, idleTimeout:0, slideshowSpeed:5000, refreshInterval:'2m'
 };
 
 export async function initGroupsIfEmpty(){

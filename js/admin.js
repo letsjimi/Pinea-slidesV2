@@ -1,4 +1,4 @@
-// PINEA Admin v4.1 — Server Backend Tabs, Upload, Gruppen, Slides, Timeline, Settings
+// PINEA Admin v6.1 — Server Backend Tabs, Upload, Gruppen, Slides, Timeline, Settings
 import { db, initDB, DEFAULT_CONFIG } from './db.js';
 import * as api from './api.js';
 import * as timelineModule from './admin-timeline.js';
@@ -337,6 +337,7 @@ async function loadConfig() {
   set('transGlobalSpeed', cfg.slideshowSpeed || 5000);
   set('cfgLabelPos', cfg.groupLabelPos);
   set('cfgDebug', cfg.debugOverlay);
+  set('cfgRefreshInterval', cfg.refreshInterval || '2m');
 }
 
 async function saveConfig() {
@@ -352,7 +353,8 @@ async function saveConfig() {
     cropMode: get('cfgCropMode'),
     showGroupLabel: get('cfgShowLabel'),
     groupLabelPos: get('cfgLabelPos'),
-    debugOverlay: get('cfgDebug')
+    debugOverlay: get('cfgDebug'),
+    refreshInterval: get('cfgRefreshInterval') || '2m'
   };
   await db.config.put(cfg);
   toast('Einstellungen gespeichert','success');

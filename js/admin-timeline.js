@@ -357,7 +357,7 @@ function renderAllRows() {
         <div class="form-row" style="margin:0;gap:6px;"><label style="min-width:auto;white-space:nowrap;">Stagger (ms):</label>
           <input type="number" value="${(layoutData.rowOffsets?.[ri]||0)}" min="0" max="20000" step="500" style="width:80px;" onchange="window.updateRowOffset(${ri},this.value)">
         </div>
-        <div class="form-row" style="margin:0;gap:6px;"><label style="min-width:auto;white-space:nowrap;">Lücke (px):</label>
+        <div class="form-row" style="margin:0;gap:6px;"><label style="min-width:auto;white-space:nowrap;">Lücke-Spalte (px):</label>
           <input type="number" value="${(rowCellGaps?.[ri])!==undefined?rowCellGaps[ri]:(layoutData.cellGap||4)}" min="0" max="50" style="width:64px;" onchange="window.updateRowCellGap(${ri},this.value)">
         </div>
       </div>
@@ -373,7 +373,7 @@ function renderSlot(rowIdx,slotIdx,slideId) {
   const url=getSlideUrl(slide);
   const span=(layoutData.timelineSpans?.[rowIdx]?.[slotIdx])||1;
   const isSpanned=span>1;
-  const btnText=isSpanned?'':'↔';
+  const btnText='↔';
   const title=isSpanned?'Auf Einzelbreite':'Auf volle Breite';
   return `<div class="row-slot assigned ${isSpanned?'spanned':''}" draggable="true" data-row="${rowIdx}" data-slot="${slotIdx}" data-slide-id="${slideId}" ondragstart="window.slotDragStart(event,${slideId},${rowIdx},${slotIdx})" ondragover="window.slotDragOver(event)" ondrop="window.slotDrop(event,${rowIdx},${slotIdx})">
     <img src="${url}" alt="${slide.name}" data-src="1">
@@ -437,7 +437,7 @@ window.updateRowCellGap=async function(ri,newVal){
   while(gaps.length<(layoutData.rows||3)) gaps.push(layoutData.cellGap||4);
   gaps[ri]=parseInt(newVal)||0;
   layoutData.rowCellGaps=gaps;
-  await db.layouts.put(layoutData); toast(`Zeile ${ri+1}: Lücke = ${newVal}px`,'success');
+  await db.layouts.put(layoutData); toast(`Zeile ${ri+1}: Lücke-Spalte = ${newVal}px`,'success');
 };
 
 window.updateRowLabel=async function(ri,newVal){
