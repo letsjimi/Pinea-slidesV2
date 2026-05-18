@@ -43,32 +43,40 @@
 
   <!-- TAB: SLIDES -->
   <section id="tab-slides" class="tab-content active">
-    <div class="card">
-      <div class="row-header">
-        <h2>📁 Slide-Galerie</h2>
-        <div style="display:flex;align-items:center;gap:12px;">
-          <select id="filterGroup" class="form-select"><option value="">Alle Gruppen</option></select>
-          <select id="filterTV" class="form-select">
-            <option value="">Alle TVs</option>
-            <option value="left">TV Links</option>
-            <option value="right">TV Rechts</option>
-            <option value="both">Beide</option>
-          </select>
-          <button class="btn btn-ghost" onclick="generateTestImages()">🎨 Testbilder</button>
-          <input type="number" id="testImageCount" value="6" min="1" max="24" style="width:60px;">
+    <div style="display:grid;grid-template-columns:1fr 260px;gap:20px;align-items:start;">
+      <div>
+        <div class="card">
+          <div class="row-header">
+            <h2>📁 Slide-Galerie</h2>
+            <div style="display:flex;align-items:center;gap:12px;">
+              <select id="filterGroup" class="form-select"><option value="">Alle Gruppen</option></select>
+              <select id="filterTV" class="form-select">
+                <option value="">Alle TVs</option>
+                <option value="left">TV Links</option>
+                <option value="right">TV Rechts</option>
+                <option value="both">Beide</option>
+              </select>
+              <button class="btn btn-ghost" onclick="generateTestImages()">🎨 Testbilder</button>
+              <input type="number" id="testImageCount" value="6" min="1" max="24" style="width:60px;">
+            </div>
+          </div>
+          <div id="slideGrid" class="thumb-grid"></div>
+          <p id="slideEmptyHint" style="display:none;text-align:center;color:#555;padding:40px;">Keine Bilder vorhanden. Wechsle zum Upload-Tab um Testbilder zu generieren.</p>
         </div>
       </div>
-      <div id="slideGrid" class="thumb-grid"></div>
-      <p id="slideEmptyHint" style="display:none;text-align:center;color:#555;padding:40px;">Keine Bilder vorhanden. Wechsle zum Upload-Tab um Testbilder zu generieren.</p>
-    </div>
 
-    <div class="card">
-      <h2>📂 Gruppen</h2>
-      <div id="groupList"></div>
-      <div class="group-add-form">
-        <input type="text" id="newGroupName" placeholder="Neue Gruppe...">
-        <input type="color" id="newGroupColor" value="#ff3366">
-        <button class="btn btn-primary" onclick="addGroup()">+ Hinzufügen</button>
+      <div>
+        <div class="card" style="padding:14px;">
+          <h2 style="font-size:14px;margin-bottom:10px;">📂 Gruppen</h2>
+          <div id="groupList" style="margin-bottom:12px;"></div>
+          <div class="group-add-form" style="flex-direction:column;align-items:stretch;gap:8px;border-top:1px solid #2a2a30;padding-top:12px;margin-top:0;">
+            <input type="text" id="newGroupName" placeholder="Neue Gruppe..." style="min-width:0;">
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input type="color" id="newGroupColor" value="#ff3366" style="width:40px;height:32px;padding:2px;flex-shrink:0;">
+              <button class="btn btn-primary" onclick="addGroup()" style="flex:1;min-width:0;font-size:12px;padding:8px;box-sizing:border-box;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">+ Hinzufügen</button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </section>
@@ -96,6 +104,7 @@
             <option value="left">TV Links</option>
             <option value="right">TV Rechts</option>
           </select>
+          <button class="btn btn-ghost" onclick="window.toggleRatioLock()" id="ratioLockBtn" title="Seitenverhältnis fixieren">🔓</button>
         </div>
       </div>
       <div id="timelineControls" style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:20px;">
@@ -111,16 +120,24 @@
         </div>
         <button class="btn btn-primary" onclick="updateMatrixFromSettings()">Anwenden</button>
       </div>
-      <div id="timelineWorkspace" style="display:grid;grid-template-columns:1fr 300px;gap:20px;align-items:stretch;">
+      <div id="timelineWorkspace" style="display:grid;grid-template-columns:1fr 540px;gap:20px;align-items:start;">
         <div id="timelineRows" style="overflow-x:auto;min-width:0;"></div>
-        <div class="card" style="position:sticky;top:80px;align-self:start;padding:14px;background:#1a1a20;height:100%;display:flex;flex-direction:column;">
-          <h3>📦 Slide-Pool</h3>
+        <div class="card" style="padding:14px;background:#1a1a20;display:flex;flex-direction:column;overflow:hidden;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+            <h3>📦 Slide-Pool</h3>
+            <div style="display:flex;gap:4px;align-items:center;background:#0f0f12;border-radius:8px;padding:2px;border:1px solid #2a2a30;">
+              <button class="btn btn-ghost" style="padding:4px 10px;font-size:16px;line-height:1;min-width:32px;" onclick="window.adjustPoolZoom(-0.2)" title="Verkleinern">−</button>
+              <span id="poolZoomValue" style="font-size:11px;color:#aaa;min-width:36px;text-align:center;font-variant-numeric:tabular-nums;">200%</span>
+              <button class="btn btn-ghost" style="padding:4px 10px;font-size:16px;line-height:1;min-width:32px;" onclick="window.adjustPoolZoom(0.2)" title="Vergrößern">+</button>
+            </div>
+          </div>
           <div style="display:flex;gap:8px;margin-bottom:12px;">
             <button class="btn btn-ghost" style="font-size:12px;padding:6px 12px;" onclick="window.togglePoolSelectAll()" id="poolSelectAllBtn">☑️ Alle</button>
             <button class="btn btn-primary" style="font-size:12px;padding:6px 12px;" onclick="window.showBatchAddDialog()">➕ Auswahl hinzufügen</button>
           </div>
+          <div id="poolGroupFilter" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;min-height:24px;"></div>
           <p style="color:#888;font-size:13px;margin-bottom:12px;">Bilder anhaken und in Zeile einfügen, oder direkt in Zeile ziehen.</p>
-          <div id="slidePool" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:8px;overflow-y:auto;"></div>
+          <div id="slidePool" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px;overflow-y:auto;flex:1;min-height:0;align-content:start;"></div>
           <div id="batchAddDialog" style="display:none;margin-top:12px;padding:12px;background:#14141a;border-radius:8px;border:1px solid #2a2a30;">
             <p style="font-size:13px;color:#888;margin-bottom:8px;">Zu welcher Zeile?</p>
             <select id="batchAddRowSelect" style="width:100%;margin-bottom:8px;"></select>
@@ -152,6 +169,21 @@
       </div>
 
       <button class="btn btn-primary" onclick="saveConfig()" style="margin-top:12px;">💾 Speichern</button>
+    </div>
+
+    <div class="card" style="margin-top:20px;border-color:#2a2a30;">
+      <h2>🔐 Passwort ändern</h2>
+      <div class="form-row" style="margin:0 0 8px;"><label>Neues Passwort:</label><input type="password" id="changePassNew" minlength="6" placeholder="Mindestens 6 Zeichen" style="max-width:320px;"></div>
+      <div class="form-row" style="margin:0 0 12px;"><label>Aktuelles Passwort:</label><input type="password" id="changePassOld" placeholder="Zur Bestätigung" style="max-width:320px;"></div>
+      <div id="changePassMsg" style="margin:4px 0 10px;font-size:13px;display:none;"></div>
+      <button class="btn btn-primary" onclick="changeMyPassword()">💾 Passwort speichern</button>
+      <p style="color:#888;font-size:12px;margin-top:8px;">Benutzername: <b>HannaM</b></p>
+    </div>
+
+    <div class="card" style="margin-top:20px;border-color:#5a3030;">
+      <h2 style="color:#e55;">⚠️ Gefahrenzone</h2>
+      <p style="color:#aaa;font-size:13px;margin-bottom:14px;">Hiermit werden ALLE Slides, Gruppen und hochgeladenen Bilder unwiderruflich gelöscht.</p>
+      <button class="btn" onclick="clearAllData()" style="background:#a22;color:#fff;border-color:#a22;">💥 Alles löschen</button>
     </div>
   </section>
 

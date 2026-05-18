@@ -1,20 +1,32 @@
 [
   {
-    "id": 1,
-    "name": "Allgemein",
-    "color": "#00aaff",
-    "sortOrder": 0
-  },
-  {
-    "id": 2,
     "name": "Programm",
-    "color": "#ffaa00",
-    "sortOrder": 1
+    "color": "#3396ff",
+    "sortOrder": 0,
+    "id": 1778746729106
   },
   {
-    "id": 3,
+    "name": "Infos",
+    "color": "#33ff8b",
+    "sortOrder": 1,
+    "id": 1778746737156
+  },
+  {
+    "name": "Allgemein",
+    "color": "#ff3333",
+    "sortOrder": 2,
+    "id": 1778746746738
+  },
+  {
+    "name": "Wochenaktuell",
+    "color": "#f133ff",
+    "sortOrder": 3,
+    "id": 1778746756252
+  },
+  {
     "name": "Specials",
-    "color": "#00ff88",
-    "sortOrder": 2
+    "color": "#ff8533",
+    "sortOrder": 4,
+    "id": 1778746767516
   }
 ]

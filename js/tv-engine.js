@@ -31,12 +31,16 @@ function applyConfig() {
   if(container && layout.rotation){
     const rot=layout.rotation;
     if(rot===90 || rot===-90){
-      const vw=window.innerWidth, vh=window.innerHeight;
-      // Nach 90°-Rotation tauschen sich Breite/Höhe:
-      // Container-Breite (wird zur Viewport-Höhe) = vh
-      // Container-Höhe  (wird zur Viewport-Breite) = vw
-      container.style.cssText=`position:fixed;left:50%;top:50%;width:${vh}px;height:${vw}px;transform:translate(-50%,-50%) rotate(${rot}deg);transform-origin:center center;`;
-      document.body.classList.add('tv-rotated');
+      const inIframe=window.self!==window.top;
+      if(inIframe){
+        // Preview iframe: simpler sizing to avoid vw/vh clipping in small frame
+        container.style.cssText=`width:100%;height:100%;transform:rotate(${rot}deg);transform-origin:center center;`;
+        document.body.classList.add('tv-rotated');
+      }else{
+        const vw=window.innerWidth, vh=window.innerHeight;
+        container.style.cssText=`position:fixed;left:50%;top:50%;width:${vh}px;height:${vw}px;transform:translate(-50%,-50%) rotate(${rot}deg);transform-origin:center center;`;
+        document.body.classList.add('tv-rotated');
+      }
     }else{
       container.style.cssText='';
       document.body.classList.remove('tv-rotated');
@@ -116,25 +120,59 @@ function renderMatrix() {
       rowWrapper.className='tv-row';
       rowWrapper.style.cssText=`flex:1;overflow:hidden;position:relative;background:#000;margin-bottom:${(r<rows-1)?rowGap+'px':'0'};`;
 
+      const spans=(layout.timelineSpans?.[r])||[];
+      // Build displayCells with real span info
+      const displayCells=[];
+      let idx=0;
+      while(displayCells.length < ids.length*3){
+        const s=spans[idx%spans.length]||1;
+        const slideId=ids[idx%ids.length];
+        displayCells.push({slideId,span:s});
+        idx++;
+      }
+
       const strip=document.createElement('div');
       strip.className='tv-strip';
       strip.dataset.row=r;
       strip.style.cssText=`display:flex;height:100%;`;
-      const displayIds=[...ids,...ids,...ids];
 
-      for(let i=0;i<displayIds.length;i++){
-        const slideId=displayIds[i];
-        const cell=document.createElement('div');
-        cell.className='tv-strip-cell';
-        // Balken als padding-right — Hintergrund des rowWrapper ist schwarz, also sichtbar
-        const isLastInBlock=(i+1)%cols===0;
-        const padRight=isLastInBlock?0:rowGap;
-        cell.style.cssText=`width:calc(100%/${cols});height:100%;flex-shrink:0;position:relative;overflow:hidden;padding-right:${padRight}px;box-sizing:border-box;`;
-        const img=document.createElement('img');
-        img.alt=''; img.loading='eager';
-        img.style.cssText='width:100%;height:100%;object-fit:var(--crop-mode,cover);display:block;';
-        loadSlideImage(slideId).then(url=>{ if(url){ img.src=url; } }).catch(()=>{});
-        cell.appendChild(img); strip.appendChild(cell);
+      // Build block groups for animation
+      const blocks=[];
+      let pos=0;
+      while(pos < displayCells.length){
+        // Step forward; each "step" covers 'step' slots, but spans consume consecutive positions
+        // For now: treat one block as one scroll step = 'step' slots
+        let blockSlots=0;
+        const blockCells=[];
+        while(blockSlots < step * cols && pos < displayCells.length){
+          const cellInfo=displayCells[pos];
+          const effectiveSpan=Math.min(cellInfo.span, cols - (blockSlots % cols));
+          blockCells.push({...cellInfo,effectiveSpan});
+          blockSlots += effectiveSpan;
+          pos++;
+        }
+        blocks.push(blockCells);
+      }
+
+      let totalCellIdx=0;
+      const totalCells=blocks.reduce((sum,b)=>sum+b.length,0);
+
+      for(let bi=0; bi<blocks.length; bi++){
+        const blockCells=blocks[bi];
+        for(const info of blockCells){
+          totalCellIdx++;
+          const isLastCell=totalCellIdx===totalCells;
+          const padRight=isLastCell?0:rowGap;
+          const wPct=(info.effectiveSpan / cols) * 100;
+          const cell=document.createElement('div');
+          cell.className='tv-strip-cell';
+          cell.style.cssText=`width:${wPct}%;height:100%;flex-shrink:0;position:relative;overflow:hidden;padding-right:${padRight}px;box-sizing:border-box;`;
+          const img=document.createElement('img');
+          img.alt=''; img.loading='eager';
+          img.style.cssText='width:100%;height:100%;object-fit:var(--crop-mode,cover);display:block;';
+          loadSlideImage(info.slideId).then(url=>{ if(url){ img.src=url; } }).catch(()=>{});
+          cell.appendChild(img); strip.appendChild(cell);
+        }
       }
 
       rowWrapper.appendChild(strip);
@@ -142,7 +180,7 @@ function renderMatrix() {
 
       if(hasImages){
         const delay=layout.rowOffsets?.[r] || 0;
-        startStripAnim(strip, ids, cols, step, delay, rowGap);
+        startStripAnim(strip, displayCells, cols, step, delay, rowGap);
       }
     }else{
       for(let c=0;c<cols;c++){
@@ -209,11 +247,11 @@ function startCellAnim(rowIdx, slideIds, cols, step, delay=0){
   rowTimers.push(initial);
 }
 
-/* STRIP ANIMATION */
-function startStripAnim(stripEl, slideIds, cols, step, delay=0, gap=0){
+/* STRIP ANIMATION (span-aware) */
+function startStripAnim(stripEl, displayCells, cols, step, delay=0, gap=0){
   const speed=config.slideshowSpeed||5000;
   const dur=transCfg.duration||1200;
-  const total=slideIds.length;
+  const total=displayCells.length;
   if(!total) return;
 
   let offset=0;
@@ -224,7 +262,8 @@ function startStripAnim(stripEl, slideIds, cols, step, delay=0, gap=0){
     const isWrapping=rawNext>=total;
 
     const blockWidth=stripEl.parentElement?.clientWidth||stripEl.clientWidth;
-    const cellWidth=blockWidth/cols; // Eine Zelle = Viewport / cols (inkl. Padding/Balken)
+    // Compute width per one-cols block
+    const cellWidth=blockWidth/cols;
     const targetX=-rawNext*cellWidth;
 
     stripEl.style.transition=`transform ${dur}ms ${transCfg.easing||'ease-in-out'}`;

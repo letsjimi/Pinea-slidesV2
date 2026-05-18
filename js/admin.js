@@ -1,6 +1,7 @@
 // PINEA Admin v4.1 — Server Backend Tabs, Upload, Gruppen, Slides, Timeline, Settings
 import { db, initDB, DEFAULT_CONFIG } from './db.js';
 import * as api from './api.js';
+import * as timelineModule from './admin-timeline.js';
 
 let groups = [], slides = [], selectedUploadGroup = null, draggedSlide = null;
 let dbReady = false, timelineLoaded = false, currentTransition = 'fade';
@@ -36,7 +37,9 @@ async function initApp(){
   try {
     await initDB(); dbReady=true;
     await loadGroups(); await loadSlides(); await loadConfig();
-    setupFilters(); renderGroups(); renderSlides(); renderGroupPills();
+    setupFilters(); renderGroups(); renderSlides(); renderGroupPills(); updateFilterOptions();
+    const lastTab=localStorage.getItem('pineaAdminTab');
+    if(lastTab) activateTab(lastTab);
     import('./admin-timeline.js').then(m=>{ if(m.initTimelineEditor) m.initTimelineEditor(); timelineLoaded=true; }).catch(()=>{});
     console.log('PINEA Admin v4.1 ready');
   } catch(err) { toast('Fehler beim Starten: '+err.message,'error'); }
@@ -82,6 +85,8 @@ function renderIPLinks() {
   updateTVPreviewRotation('right');
 }
 
+let ratioLocked = false;
+
 async function updateTVPreviewRotation(side) {
   try {
     const layout = await api.getLayout(side);
@@ -94,6 +99,12 @@ async function updateTVPreviewRotation(side) {
       if (rot === 90) frame.classList.add('rotated-90');
       else if (rot === -90) frame.classList.add('rotated-minus90');
       else frame.classList.add('rotated-0');
+
+      if (ratioLocked) {
+        frame.classList.remove('landscape', 'portrait');
+        const isPortrait = (rot === 90 || rot === -90);
+        frame.classList.add(isPortrait ? 'portrait' : 'landscape');
+      }
     }
   } catch(e) { console.warn('Rotation fetch failed for', side, e); }
 }
@@ -114,18 +125,24 @@ window.openTV = function(side) {
 };
 
 /* TABS */
+function activateTab(tab){
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
+  const btn=document.querySelector(`.tab-btn[data-tab="${tab}"]`);
+  const t=document.getElementById('tab-'+tab);
+  if(btn) btn.classList.add('active');
+  if(t) t.classList.add('active');
+  if(tab==='timeline'&&!timelineLoaded){
+    import('./admin-timeline.js').then(m=>{if(m.initTimelineEditor)m.initTimelineEditor(); timelineLoaded=true;}).catch(()=>{});
+  }
+}
 function setupTabs() {
-  document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', e => {
+  document.querySelectorAll('.tab-btn').forEach(btn=>{
+    btn.addEventListener('click',e=>{
       e.stopPropagation();
-      const tab = btn.dataset.tab; if(!tab) return;
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-      btn.classList.add('active');
-      const t = document.getElementById('tab-'+tab); if(t) t.classList.add('active');
-      if(tab==='timeline' && !timelineLoaded) {
-        import('./admin-timeline.js').then(m => { if(m.initTimelineEditor) m.initTimelineEditor(); timelineLoaded = true; }).catch(()=>{});
-      }
+      const tab=btn.dataset.tab; if(!tab) return;
+      localStorage.setItem('pineaAdminTab',tab);
+      activateTab(tab);
     });
   });
 }
@@ -223,6 +240,7 @@ async function handleFiles(files) {
   if(newSlides.length) await db.slides.bulkAdd(newSlides);
   zone.classList.remove('uploading'); const p=zone.querySelector('p'); if(p) p.textContent='Dateien hier reinziehen oder klicken';
   await loadSlides(); renderSlides(); renderGroupPills();
+  if(timelineModule.refreshPoolAndRows) await timelineModule.refreshPoolAndRows();
   toast(`${newSlides.length} Bilder hochgeladen`,'success');
 }
 window.handleFiles = handleFiles;
@@ -260,6 +278,7 @@ async function generateTestImages() {
   }
   if(newSlides.length) await db.slides.bulkAdd(newSlides);
   await loadSlides(); renderSlides();
+  if(timelineModule.refreshPoolAndRows) await timelineModule.refreshPoolAndRows();
   toast(`${newSlides.length} Testbilder generiert`,'success');
 }
 window.generateTestImages = generateTestImages;
@@ -280,7 +299,7 @@ function renderSlides() {
     return `<div class="thumb-item" draggable="true" data-id="${s.id}" data-idx="${idx}" ondragstart="window.slideDragStart(${s.id})" ondragover="event.preventDefault()" ondrop="window.slideDrop(event,${idx})" ondragend="window.slideDragEnd()">
       <img src="${url}" alt="${s.name}" loading="lazy">
       <div class="thumb-overlay"><span>${s.name.substring(0,20)}</span><span style="font-size:10px;opacity:.7">${s.tvAssignment} | ${s.groupName}</span></div>
-      <div class="thumb-actions"><button onclick="window.deleteSlide(${s.id})" title="Löschen">🗑️</button><button onclick="window.cycleTV(${s.id})" title="TV">📺</button></div>
+      <div class="thumb-actions"><button onclick="window.deleteSlide(${s.id})" title="Löschen">🗑️</button></div>
     </div>`;
   }).join('');
 }
@@ -296,7 +315,7 @@ function updateFilterOptions() {
 function slideDragStart(id){ draggedSlide=slides.find(s=>s.id===id); }
 async function slideDrop(e,dropIdx){ e.preventDefault(); if(!draggedSlide) return; const di=slides.findIndex(s=>s.id===draggedSlide.id); if(di===-1||di===dropIdx) return; const[moved]=slides.splice(di,1); slides.splice(dropIdx,0,moved); for(let i=0;i<slides.length;i++) await db.slides.update(slides[i].id,{sortOrder:i}); await loadSlides(); renderSlides(); toast('Reihenfolge aktualisiert','success'); }
 function slideDragEnd(){ draggedSlide=null; }
-async function deleteSlide(id){ if(!confirm('Löschen?')) return; await db.slides.delete(id); await loadSlides(); renderSlides(); toast('Gelöscht','success'); }
+async function deleteSlide(id){ if(!confirm('Löschen?')) return; await db.slides.delete(id); await loadSlides(); renderSlides(); if(timelineModule.refreshPoolAndRows) timelineModule.refreshPoolAndRows(); toast('Gelöscht','success'); }
 async function cycleTV(id){ const s=slides.find(x=>x.id===id); const nxt=s.tvAssignment==='both'?'left':s.tvAssignment==='left'?'right':'both'; await db.slides.update(id,{tvAssignment:nxt}); await loadSlides(); renderSlides(); toast(`TV: ${nxt}`,'info'); }
 window.slideDragStart=slideDragStart; window.slideDrop=slideDrop; window.slideDragEnd=slideDragEnd; window.deleteSlide=deleteSlide; window.cycleTV=cycleTV;
 
@@ -382,6 +401,24 @@ async function saveTransitionConfig() {
 }
 
 window.pineaLogout=function(){ api.logout(); window.location.reload(); };
+
+window.changeMyPassword=async function(){
+  const msg=document.getElementById('changePassMsg');
+  const oldP=document.getElementById('changePassOld').value;
+  const newP=document.getElementById('changePassNew').value;
+  if(newP.length<6){ msg.style.cssText='display:block;color:#f44'; msg.textContent='Passwort muss mindestens 6 Zeichen haben.'; return; }
+  if(!oldP){ msg.style.cssText='display:block;color:#f44'; msg.textContent='Bitte aktuelles Passwort eingeben.'; return; }
+  msg.style.cssText='display:block;color:#8f8'; msg.textContent='Speichere...';
+  try{
+    await api.changePassword({oldPassword:oldP,newPassword:newP});
+    msg.style.cssText='display:block;color:#5f5'; msg.textContent='✅ Passwort gespeichert.';
+    document.getElementById('changePassOld').value='';
+    document.getElementById('changePassNew').value='';
+  }catch(e){
+    msg.style.cssText='display:block;color:#f44'; msg.textContent='Fehler: '+(e.message||'Unbekannt');
+  }
+};
+
 window.saveTransitionConfig = saveTransitionConfig;
 
 window.refreshPreview = async function(side) {
@@ -396,4 +433,43 @@ function testTransition() {
   window.open(testUrl, '_blank');
 }
 window.testTransition = testTransition;
+
+window.toggleRatioLock = async function() {
+  ratioLocked = !ratioLocked;
+  const btn = document.getElementById('ratioLockBtn');
+  if (btn) {
+    btn.textContent = ratioLocked ? '🔒' : '🔓';
+    btn.title = ratioLocked ? 'Seitenverhältnis fixiert' : 'Seitenverhältnis fixieren';
+    btn.style.color = ratioLocked ? '#ff3366' : '';
+  }
+
+  ['left', 'right'].forEach(side => {
+    const frame = document.getElementById('frame' + (side === 'left' ? 'Left' : 'Right'));
+    if (!frame) return;
+    frame.classList.remove('locked', 'landscape', 'portrait');
+    if (ratioLocked) {
+      frame.classList.add('locked');
+      const rotText = document.getElementById('badge' + (side === 'left' ? 'Left' : 'Right'))?.textContent;
+      const isPortrait = rotText && rotText.includes('90');
+      frame.classList.add(isPortrait ? 'portrait' : 'landscape');
+    }
+  });
+
+  await updateTVPreviewRotation('left');
+  await updateTVPreviewRotation('right');
+}
+
+async function clearAllData() {
+  if(!confirm('⚠️ WIRKLICH ALLES LÖSCHEN?\n\nAlle Slides, Gruppen und Bilder werden unwiderruflich gelöscht!')) return;
+  if(!confirm('ABSOLUT SICHER? Dies kann nicht rückgängig gemacht werden.')) return;
+  try {
+    await db.slides.clear();
+    await db.groups.clear();
+    slides=[]; groups=[]; selectedUploadGroup=null; selectedGroup='all';
+    await loadSlides(); renderSlides(); renderGroupPills(); renderGroupSelect();
+    if(timelineModule.refreshPoolAndRows) await timelineModule.refreshPoolAndRows();
+    toast('🗑️ Alle Daten gelöscht','success');
+  } catch(err){ toast('Fehler: '+err.message,'error'); }
+}
+window.clearAllData = clearAllData;
 

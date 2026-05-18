@@ -1,13 +1,27 @@
 // PINEA Slides V4.1 — API Client
 const API_BASE = '';
 
+function getToken(){
+  const token = localStorage.getItem('pinea_token');
+  const loginTime = Number(localStorage.getItem('pinea_login_time')||0);
+  if(!token || !loginTime) return null;
+  const elapsed = Date.now() - loginTime;
+  if(elapsed > 7*24*60*60*1000){  // 7 Tage
+    localStorage.removeItem('pinea_token');
+    localStorage.removeItem('pinea_login_time');
+    return null;
+  }
+  return token;
+}
+
 function api(path, opts={}){
     opts.headers = {...(opts.headers||{})};
-    const token = localStorage.getItem('pinea_token');
+    const token = getToken();
     if(token) opts.headers['Authorization'] = 'Bearer ' + token;
     return fetch(API_BASE + path, opts).then(async r=>{
         if(r.status===401){
             localStorage.removeItem('pinea_token');
+            localStorage.removeItem('pinea_login_time');
             if(typeof window !== 'undefined' && window.dispatchEvent){
                 window.dispatchEvent(new CustomEvent('pinea-logout'));
             }
@@ -23,7 +37,11 @@ function api(path, opts={}){
     });
 }
 
-export const login = (body) => api('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(r=>{localStorage.setItem('pinea_token',r.token); return r;});
+export const login = (body) => api('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(r=>{
+    localStorage.setItem('pinea_token',r.token);
+    localStorage.setItem('pinea_login_time', String(Date.now()));
+    return r;
+});
 export const changePassword = (body) => api('/api/auth/change-password',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
 export const getConfig = () => api('/api/config');
 export const putConfig = (body) => api('/api/config',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
