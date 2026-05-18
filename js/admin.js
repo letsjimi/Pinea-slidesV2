@@ -1,4 +1,4 @@
-// PINEA Admin v4.1 — Server Backend Tabs, Upload, Gruppen, Slides, Timeline, Settings
+// PINEA Admin v6.1 — Server Backend Tabs, Upload, Gruppen, Slides, Timeline, Settings
 import { db, initDB, DEFAULT_CONFIG } from './db.js';
 import * as api from './api.js';
 import * as timelineModule from './admin-timeline.js';

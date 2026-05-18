@@ -3,9 +3,9 @@
   "gridColor": "#ff3366",
   "gridVisible": false,
   "gridOpacity": 0.4,
-  "gridWidthPx": 4,
-  "gridCols": 2,
-  "gridRows": 3,
+  "gridWidthPx": null,
+  "gridCols": null,
+  "gridRows": null,
   "cropMode": "cover",
   "transitionType": "slide",
   "transitionSettings": {

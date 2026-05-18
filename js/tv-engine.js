@@ -1,4 +1,4 @@
-// PINEA TV Engine v4.1 — Server Backend Ready
+// PINEA TV Engine v6.1 — Server Backend Ready
 import { db, initDB, DEFAULT_CONFIG } from './db.js';
 
 let config={}, transCfg={}, layout=null, tvSide=null;
@@ -162,7 +162,7 @@ function renderMatrix() {
         for(const info of blockCells){
           totalCellIdx++;
           const isLastCell=totalCellIdx===totalCells;
-          const padRight=isLastCell?0:rowGap;
+          const padRight=(isLastCell||info.effectiveSpan>=cols)?0:rowGap;
           const wPct=(info.effectiveSpan / cols) * 100;
           const cell=document.createElement('div');
           cell.className='tv-strip-cell';
