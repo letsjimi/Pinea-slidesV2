@@ -219,55 +219,52 @@ function startCellAnim(rowIdx, slideIds, cols, step, delay=0){
   rowTimers.push(initial);
 }
 
-/* STRIP ANIMATION (span-aware, seamless looping) */
+/* STRIP ANIMATION — scroll by column-width pixels, seamless looping */
 function startStripAnim(stripEl, displayCells, cols, step, delay=0, gap=0){
   const speed=config.slideshowSpeed||5000;
   const dur=transCfg.duration||1200;
-  const total=displayCells.length;
-  if(!total) return;
+  const totalCells=displayCells.length;
+  const oneRound=totalCells/3;
+  if(!oneRound) return;
 
-  // displayCells contains 3× timeline copies for seamless looping
-  const oneRound = total / 3;
+  let scrollX=0;  // cumulative scroll position in px
 
-  let offset=0;
-
-  function getCellWidths(){
-    const cells=stripEl.querySelectorAll(':scope > .tv-strip-cell');
-    const widths=[];
-    cells.forEach(c=>widths.push(c.getBoundingClientRect().width));
-    return widths;
-  }
-
-  function getXForOffset(idx){
-    const widths=getCellWidths();
-    let x=0;
-    for(let i=0;i<idx;i++) x+=(widths[i]||0)+(gap||0);
-    return -x;
+  function getRoundWidth(){
+    const cells=Array.from(stripEl.querySelectorAll(':scope > .tv-strip-cell'));
+    const oneRoundCells=cells.slice(0,oneRound);
+    let w=0;
+    oneRoundCells.forEach((c,i)=>{
+      w+=c.getBoundingClientRect().width;
+      if(i<oneRoundCells.length-1) w+=(gap||0);
+    });
+    return w;
   }
 
   const tick=()=>{
-    let nextOffset=offset+step;
+    const containerW=stripEl.parentElement?.clientWidth||stripEl.clientWidth;
+    const colW=containerW/cols;
+    scrollX+=step*colW;
 
-    if(nextOffset >= oneRound){
-      // Animate to the end of the first round (into identical second copy)
+    const roundW=getRoundWidth();
+
+    if(scrollX>=roundW){
+      // Animate to the wrapped position (in the 2nd copy)
       stripEl.style.transition=`transform ${dur}ms ${transCfg.easing||'ease-in-out'}`;
-      stripEl.style.transform=`translateX(${getXForOffset(nextOffset)}px)`;
-      offset=nextOffset;
+      stripEl.style.transform=`translateX(${-scrollX}px)`;
 
-      // After animation, snap back by oneRound — cells are identical so jump is invisible
+      // After transition, snap back by roundW (invisible jump)
       setTimeout(()=>{
+        scrollX-=roundW;
         stripEl.style.transition='none';
-        stripEl.style.transform=`translateX(${getXForOffset(offset - oneRound)}px)`;
-        void stripEl.offsetWidth; // force reflow
+        stripEl.style.transform=`translateX(${-scrollX}px)`;
+        void stripEl.offsetWidth;
         stripEl.style.transition='';
-        offset=offset - oneRound;
       }, dur);
       return;
     }
 
     stripEl.style.transition=`transform ${dur}ms ${transCfg.easing||'ease-in-out'}`;
-    stripEl.style.transform=`translateX(${getXForOffset(nextOffset)}px)`;
-    offset=nextOffset;
+    stripEl.style.transform=`translateX(${-scrollX}px)`;
   };
 
   const initial=setTimeout(()=>{
