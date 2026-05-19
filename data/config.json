@@ -19,7 +19,7 @@
   "debugOverlay": true,
   "autoStart": true,
   "idleTimeout": 0,
-  "slideshowSpeed": 2000,
+  "slideshowSpeed": 5000,
   "refreshInterval": "1m",
-  "lastModified": 1778755200000
+  "lastModified": 1779192745149
 }

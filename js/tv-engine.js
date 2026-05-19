@@ -122,58 +122,29 @@ function renderMatrix() {
       rowWrapper.style.cssText=`flex:1;overflow:hidden;position:relative;background:#000;margin-bottom:${(r<rows-1)?rowGap+'px':'0'};`;
 
       const spans=(layout.timelineSpans?.[r])||[];
-      // Build displayCells with real span info
+      // Build flat displayCells — triple the timeline for seamless looping
       const displayCells=[];
-      let idx=0;
-      while(displayCells.length < ids.length*3){
-        const s=spans[idx%spans.length]||1;
-        const slideId=ids[idx%ids.length];
-        displayCells.push({slideId,span:s});
-        idx++;
+      for(let round=0; round<3; round++){
+        for(let i=0; i<ids.length; i++){
+          displayCells.push({slideId:ids[i], span:spans[i]||1});
+        }
       }
 
       const strip=document.createElement('div');
       strip.className='tv-strip';
       strip.dataset.row=r;
-      strip.style.cssText=`display:flex;height:100%;`;
+      strip.style.cssText=`display:flex;height:100%;gap:${rowGap}px;`;
 
-      // Build block groups for animation
-      const blocks=[];
-      let pos=0;
-      while(pos < displayCells.length){
-        // Step forward; each "step" covers 'step' slots, but spans consume consecutive positions
-        // For now: treat one block as one scroll step = 'step' slots
-        let blockSlots=0;
-        const blockCells=[];
-        while(blockSlots < step * cols && pos < displayCells.length){
-          const cellInfo=displayCells[pos];
-          const effectiveSpan=Math.min(cellInfo.span, cols - (blockSlots % cols));
-          blockCells.push({...cellInfo,effectiveSpan});
-          blockSlots += effectiveSpan;
-          pos++;
-        }
-        blocks.push(blockCells);
-      }
-
-      let totalCellIdx=0;
-      const totalCells=blocks.reduce((sum,b)=>sum+b.length,0);
-
-      for(let bi=0; bi<blocks.length; bi++){
-        const blockCells=blocks[bi];
-        for(const info of blockCells){
-          totalCellIdx++;
-          const isLastCell=totalCellIdx===totalCells;
-          const padRight=(isLastCell||info.effectiveSpan>=cols)?0:rowGap;
-          const wPct=(info.effectiveSpan / cols) * 100;
-          const cell=document.createElement('div');
-          cell.className='tv-strip-cell';
-          cell.style.cssText=`width:${wPct}%;height:100%;flex-shrink:0;position:relative;overflow:hidden;padding-right:${padRight}px;box-sizing:border-box;`;
-          const img=document.createElement('img');
-          img.alt=''; img.loading='eager';
-          img.style.cssText='width:100%;height:100%;object-fit:var(--crop-mode,cover);display:block;';
-          loadSlideImage(info.slideId).then(url=>{ if(url){ img.src=url; } }).catch(()=>{});
-          cell.appendChild(img); strip.appendChild(cell);
-        }
+      for(const info of displayCells){
+        const wPct=(Math.min(info.span,cols)/cols)*100;
+        const cell=document.createElement('div');
+        cell.className='tv-strip-cell';
+        cell.style.cssText=`flex:0 0 ${wPct}%;height:100%;position:relative;overflow:hidden;box-sizing:border-box;`;
+        const img=document.createElement('img');
+        img.alt=''; img.loading='eager';
+        img.style.cssText='width:100%;height:100%;object-fit:var(--crop-mode,cover);display:block;';
+        loadSlideImage(info.slideId).then(url=>{ if(url){ img.src=url; } }).catch(()=>{});
+        cell.appendChild(img); strip.appendChild(cell);
       }
 
       rowWrapper.appendChild(strip);
@@ -248,36 +219,54 @@ function startCellAnim(rowIdx, slideIds, cols, step, delay=0){
   rowTimers.push(initial);
 }
 
-/* STRIP ANIMATION (span-aware) */
+/* STRIP ANIMATION (span-aware, seamless looping) */
 function startStripAnim(stripEl, displayCells, cols, step, delay=0, gap=0){
   const speed=config.slideshowSpeed||5000;
   const dur=transCfg.duration||1200;
   const total=displayCells.length;
   if(!total) return;
 
+  // displayCells contains 3× timeline copies for seamless looping
+  const oneRound = total / 3;
+
   let offset=0;
 
+  function getCellWidths(){
+    const cells=stripEl.querySelectorAll(':scope > .tv-strip-cell');
+    const widths=[];
+    cells.forEach(c=>widths.push(c.getBoundingClientRect().width));
+    return widths;
+  }
+
+  function getXForOffset(idx){
+    const widths=getCellWidths();
+    let x=0;
+    for(let i=0;i<idx;i++) x+=(widths[i]||0)+(gap||0);
+    return -x;
+  }
+
   const tick=()=>{
-    const rawNext=offset+step;
-    const nextOffset=rawNext%total;
-    const isWrapping=rawNext>=total;
+    let nextOffset=offset+step;
 
-    const blockWidth=stripEl.parentElement?.clientWidth||stripEl.clientWidth;
-    // Compute width per one-cols block
-    const cellWidth=blockWidth/cols;
-    const targetX=-rawNext*cellWidth;
+    if(nextOffset >= oneRound){
+      // Animate to the end of the first round (into identical second copy)
+      stripEl.style.transition=`transform ${dur}ms ${transCfg.easing||'ease-in-out'}`;
+      stripEl.style.transform=`translateX(${getXForOffset(nextOffset)}px)`;
+      offset=nextOffset;
 
-    stripEl.style.transition=`transform ${dur}ms ${transCfg.easing||'ease-in-out'}`;
-    stripEl.style.transform=`translateX(${targetX}px)`;
-
-    if(isWrapping){
+      // After animation, snap back by oneRound — cells are identical so jump is invisible
       setTimeout(()=>{
         stripEl.style.transition='none';
-        stripEl.style.transform=`translateX(${-nextOffset*cellWidth}px)`;
-        requestAnimationFrame(()=>{ stripEl.style.transition=''; });
+        stripEl.style.transform=`translateX(${getXForOffset(offset - oneRound)}px)`;
+        void stripEl.offsetWidth; // force reflow
+        stripEl.style.transition='';
+        offset=offset - oneRound;
       }, dur);
+      return;
     }
 
+    stripEl.style.transition=`transform ${dur}ms ${transCfg.easing||'ease-in-out'}`;
+    stripEl.style.transform=`translateX(${getXForOffset(nextOffset)}px)`;
     offset=nextOffset;
   };
 
