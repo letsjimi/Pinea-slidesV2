@@ -98,11 +98,11 @@ function renderMatrix() {
 
   if(isMixedModes){
     matrix.style.cssText=`display:flex;flex-direction:column;position:absolute;inset:0;z-index:1;`;
+  }else{
+    const firstMode=(layout.rowAnimationModes?.[0])||'cell';
+    if(firstMode==='strip' || firstMode==='timeline'){
+      matrix.style.cssText=`display:flex;flex-direction:column;position:absolute;inset:0;z-index:1;`;
     }else{
-      const firstMode=(layout.rowAnimationModes?.[0])||'cell';
-      if(firstMode==='strip' || firstMode==='timeline'){
-        matrix.style.cssText=`display:flex;flex-direction:column;position:absolute;inset:0;z-index:1;`;
-      }else{
       const globalGap=layout.cellGap||4;
       matrix.style.cssText=`display:grid;grid-template-rows:repeat(${rows},1fr);grid-template-columns:repeat(${cols},1fr);gap:${globalGap}px;position:absolute;inset:0;z-index:1;`;
     }
@@ -223,7 +223,7 @@ function startCellAnim(rowIdx, slideIds, cols, step, delay=0){
   rowTimers.push(initial);
 }
 
-/* STRIP ANIMATION — scroll by column-width pixels, seamless looping */
+/* STRIP ANIMATION — scroll by step cells, seamless looping */
 function startStripAnim(stripEl, displayCells, cols, step, delay=0, gap=0){
   const speed=config.slideshowSpeed||5000;
   const dur=transCfg.duration||1200;
@@ -231,44 +231,54 @@ function startStripAnim(stripEl, displayCells, cols, step, delay=0, gap=0){
   const oneRound=totalCells/3;
   if(!oneRound) return;
 
-  let scrollX=0;  // cumulative scroll position in px
+  let frame=0; // index within one round
+  const spans=displayCells.slice(0,oneRound).map(c=>c.span||1);
 
   function getRoundWidth(){
-    const cells=Array.from(stripEl.querySelectorAll(':scope > .tv-strip-cell'));
-    const oneRoundCells=cells.slice(0,oneRound);
+    const containerW=stripEl.parentElement?.clientWidth||stripEl.clientWidth;
     let w=0;
-    oneRoundCells.forEach((c,i)=>{
-      w+=c.getBoundingClientRect().width;
-      if(i<oneRoundCells.length-1) w+=(gap||0);
+    spans.forEach((sp,i)=>{
+      w+=(Math.min(sp,cols)/cols)*containerW;
+      if(i<spans.length-1) w+=(gap||0);
     });
     return w;
   }
 
+  function getOffsetForCellIdx(idx){
+    const containerW=stripEl.parentElement?.clientWidth||stripEl.clientWidth;
+    let off=0;
+    for(let i=0;i<idx;i++){
+      off+=(Math.min(spans[i],cols)/cols)*containerW;
+      if(i<spans.length-1) off+=(gap||0);
+    }
+    return off;
+  }
+
+  // Start in middle copy (copy 1)
+  const roundW=getRoundWidth();
+  stripEl.style.transition='none';
+  stripEl.style.transform=`translateX(${-roundW}px)`;
+
   const tick=()=>{
     const containerW=stripEl.parentElement?.clientWidth||stripEl.clientWidth;
-    const colW=containerW/cols;
-    scrollX+=step*colW;
+    frame=(frame+step)%oneRound;
 
-    const roundW=getRoundWidth();
+    const cellOffset=getOffsetForCellIdx(frame);
+    const visibleX=roundW+cellOffset; // middle copy + cell offset
 
-    if(scrollX>=roundW){
-      // Animate to the wrapped position (in the 2nd copy)
-      stripEl.style.transition=`transform ${dur}ms ${transCfg.easing||'ease-in-out'}`;
-      stripEl.style.transform=`translateX(${-scrollX}px)`;
+    stripEl.style.transition=`transform ${dur}ms ${transCfg.easing||'ease-in-out'}`;
+    stripEl.style.transform=`translateX(${-visibleX}px)`;
 
-      // After transition, snap back by roundW (invisible jump)
+    // If approaching end of middle copy, snap back to same position in first copy
+    const endThreshold=2*roundW - containerW;
+    if(visibleX >= endThreshold){
       setTimeout(()=>{
-        scrollX-=roundW;
         stripEl.style.transition='none';
-        stripEl.style.transform=`translateX(${-scrollX}px)`;
+        stripEl.style.transform=`translateX(${-(roundW+cellOffset-roundW)}px)`; // = -cellOffset in first copy
         void stripEl.offsetWidth;
         stripEl.style.transition='';
       }, dur);
-      return;
     }
-
-    stripEl.style.transition=`transform ${dur}ms ${transCfg.easing||'ease-in-out'}`;
-    stripEl.style.transform=`translateX(${-scrollX}px)`;
   };
 
   const initial=setTimeout(()=>{
@@ -326,45 +336,53 @@ function startTimelineStripAnim(stripEl, displayCells, cols, step, delay, gap){
   const oneRound=totalCells/3;
   if(!oneRound) return;
 
-  let roundScrollX=0; // accumulated px offset (in first round)
+  let frame=0; // index within one round
+  const spans=displayCells.slice(0,oneRound).map(c=>c.span||1);
 
-  // Width snapshot: pixel offsets of each cell boundary (cumulative)
-  function computeOffsets(){
-    const cells=Array.from(stripEl.querySelectorAll(':scope > .tv-strip-cell'));
-    const roundCells=cells.slice(0,oneRound);
-    let off=[0];
-    roundCells.forEach((c,i)=>>{
-      off.push(off[off.length-1]+c.getBoundingClientRect().width+(i<roundCells.length-1?(gap||0):0));
+  function getRoundWidth(){
+    const containerW=stripEl.parentElement?.clientWidth||stripEl.clientWidth;
+    let w=0;
+    spans.forEach((sp,i)=>{
+      w+=(Math.min(sp,cols)/cols)*containerW;
+      if(i<spans.length-1) w+=(gap||0);
     });
-    return off; // length = oneRound+1
+    return w;
   }
 
-  let offsets=computeOffsets();
+  function getOffsetForCellIdx(idx){
+    const containerW=stripEl.parentElement?.clientWidth||stripEl.clientWidth;
+    let off=0;
+    for(let i=0;i<idx;i++){
+      off+=(Math.min(spans[i],cols)/cols)*containerW;
+      if(i<spans.length-1) off+=(gap||0);
+    }
+    return off;
+  }
+
+  // Start in middle copy (copy 1)
+  const roundW=getRoundWidth();
+  stripEl.style.transition='none';
+  stripEl.style.transform=`translateX(${-roundW}px)`;
 
   const tick=()=>{
-    // Recalc offsets on first tick / resize (lazy)
-    if(!offsets) offsets=computeOffsets();
-    const maxScroll=offsets[oneRound];
+    const containerW=stripEl.parentElement?.clientWidth||stripEl.clientWidth;
+    frame=(frame+step)%oneRound;
 
-    // Advance by `step` cells
-    const currentCellIdx=Math.round(roundScrollX/(maxScroll/oneRound||1));
-    const nextCellIdx=(currentCellIdx+step)%oneRound;
-    roundScrollX=offsets[nextCellIdx];
-
-    const stripW=stripEl.scrollWidth; // entire 3x strip width
-
-    // If position is near the end, snap back to the same logical position in the first copy (seamless)
-    // We are showing 3x copies. The wrap point is at ~oneRound cells in.
-    // The visible offset within the strip = roundScrollX (in first round) + roundW per copy number.
-    let visibleX=roundScrollX;
-
-    // Ensure we stay in the middle copy for wrapping safety
-    // Copy 0: [0..roundW), Copy 1: [roundW..2*roundW), Copy 2: [2*roundW..3*roundW)
-    const middleCopyStart=offsets[oneRound];
-    visibleX+=middleCopyStart;
+    const cellOffset=getOffsetForCellIdx(frame);
+    const visibleX=roundW+cellOffset;
 
     stripEl.style.transition=`transform ${dur}ms ${transCfg.easing||'ease-in-out'}`;
     stripEl.style.transform=`translateX(${-visibleX}px)`;
+
+    const endThreshold=2*roundW - containerW;
+    if(visibleX >= endThreshold){
+      setTimeout(()=>{
+        stripEl.style.transition='none';
+        stripEl.style.transform=`translateX(${-(roundW+cellOffset-roundW)}px)`;
+        void stripEl.offsetWidth;
+        stripEl.style.transition='';
+      }, dur);
+    }
   };
 
   const initial=setTimeout(()=>{
@@ -564,8 +582,12 @@ function applyTransition(img, newUrl, oldSrc, type, dur){
       img.style.transform='translateX(-100%)';
       setTimeout(()=>{
         cleanup(); img.src=newUrl;
+        img.style.transition='none';
         img.style.transform='translateX(100%)';
-        requestAnimationFrame(()=>img.style.transform='translateX(0)');
+        requestAnimationFrame(()=>{
+          img.style.transition=`transform ${dur}ms ${ease}`;
+          img.style.transform='translateX(0)';
+        });
       }, dur);
       break;
     }
