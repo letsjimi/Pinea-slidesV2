@@ -115,10 +115,11 @@ function renderMatrix() {
     const isStrip=mode==='strip';
     const isTimeline=mode==='timeline';
     const step=(isStrip||isTimeline?(layout.stripSteps?.[r]):(layout.rowSteps?.[r]))||1;
+    const delay=layout.rowOffsets?.[r] || 0;
     const rowGap=(layout.rowCellGaps?.[r])!==undefined ? layout.rowCellGaps[r] : (layout.cellGap||4);
 
     if(isTimeline){
-      renderTimelineRow(r,ids,cols,step,delay,rowGap);
+      renderTimelineRow(matrix, r,ids,cols,step,delay,rowGap);
     }else if(isStrip){
       const rowWrapper=document.createElement('div');
       rowWrapper.className='tv-row';
@@ -278,111 +279,97 @@ function startStripAnim(stripEl, displayCells, cols, step, delay=0, gap=0){
   rowTimers.push(initial);
 }
 
-/* TIMELINE SCROLL */
-function renderTimelineRow(r, ids, cols, step, delay, gap){
+/* TIMELINE SCROLL — drift-free frame-based viewport cycling */
+function renderTimelineRow(matrixEl, r, ids, cols, step, delay, gap){
   const rowWrapper=document.createElement('div');
   rowWrapper.className='tv-row timeline-row';
   rowWrapper.style.cssText=`flex:1;overflow:hidden;position:relative;background:#000;margin-bottom:${(r<(layout.rows||3)-1)?gap+'px':'0'};`;
 
   const spans=layout.timelineSpans?.[r]||[];
-  // Flatten timeline into slots: one slot = one column
-  const slots=[]; // each slot = {slideId, slotW}
+  // Flatten timeline into frames: one frame = one column-width unit
+  // Span>1 duplicates the slideId consecutively
+  const frames=[]; // {slideId} per column unit
   for(let i=0;i<ids.length;i++){
     const span=Math.min(spans[i]||1, cols);
-    slots.push({slideId:ids[i], span, slotW:100/cols});
-    if(span>1){
-      for(let s=1;s<span;s++) slots.push(null); // filler slots for visual spacing
-    }
+    for(let s=0;s<span;s++) frames.push({slideId:ids[i]});
   }
-
-  // Repeat for seamless loop (2 copies)
-  const displaySlots=[...slots,...slots];
+  const frameLen=frames.length;
+  if(!frameLen) return;
 
   const strip=document.createElement('div');
   strip.className='tv-strip';
   strip.dataset.row=r;
-  strip.style.cssText=`display:flex;height:100%;transition:none;`;
+  strip.style.cssText=`display:flex;height:100%;gap:${gap}px;`;
 
-  displaySlots.forEach(slot=>{
+  // Create exactly `cols` cells, each with A/B layers
+  const cellMeta=[]; // track current slideId per cell
+  for(let c=0;c<cols;c++){
     const cell=document.createElement('div');
     cell.className='tv-strip-cell';
-    if(!slot){
-      cell.style.cssText=`flex:0 0 0px;height:100%;overflow:hidden;`;
-    }else{
-      cell.style.cssText=`flex:0 0 ${slot.slotW}%;height:100%;position:relative;overflow:hidden;box-sizing:border-box;`;
-      // A/B layers inside each cell
-      const layerA=document.createElement('img');
-      const layerB=document.createElement('img');
-      layerA.className='tl-layer tl-active';
-      layerB.className='tl-layer tl-next';
-      [layerA,layerB].forEach(img=>{
-        img.alt=''; img.loading='eager';
-        img.style.cssText='width:100%;height:100%;object-fit:var(--crop-mode,cover);display:block;position:absolute;inset:0;';
-      });
-      loadSlideImage(slot.slideId).then(url=>{ if(url) layerA.src=url; }).catch(()=>{});
-      cell.appendChild(layerA); cell.appendChild(layerB);
-    }
+    cell.style.cssText=`flex:0 0 calc(${100/cols}% - ${gap*(cols-1)/cols}px);height:100%;position:relative;overflow:hidden;box-sizing:border-box;`;
+
+    const layerA=document.createElement('img');
+    const layerB=document.createElement('img');
+    layerA.className='tl-layer tl-active';
+    layerB.className='tl-layer tl-next';
+    [layerA,layerB].forEach(img=>{
+      img.alt=''; img.loading='eager';
+      img.style.cssText='width:100%;height:100%;object-fit:var(--crop-mode,cover);display:block;position:absolute;inset:0;';
+    });
+
+    // Initial content from frames[c % frameLen]
+    const initFrame=frames[c % frameLen];
+    cellMeta[c]=initFrame ? initFrame.slideId : null;
+    if(initFrame) loadSlideImage(initFrame.slideId).then(url=>{ if(url) layerA.src=url; }).catch(()=>{});
+
+    cell.appendChild(layerA); cell.appendChild(layerB);
     strip.appendChild(cell);
-  });
+  }
 
   rowWrapper.appendChild(strip);
-  matrix.appendChild(rowWrapper);
+  matrixEl.appendChild(rowWrapper);
 
-  if(ids.length>0){
-    startTimelineScroll(strip, displaySlots, cols, step, delay, gap);
+  if(frameLen>0 && ids.length>0){
+    startTimelineScroll(strip, frames, cols, step, delay, cellMeta);
   }
 }
 
-function startTimelineScroll(stripEl, displaySlots, cols, step, delay=0, gap=0){
+function startTimelineScroll(stripEl, frames, cols, step, delay, cellMeta){
   const speed=config.slideshowSpeed||5000;
   const dur=transCfg.duration||1200;
   const transType=config.transitionType||'fade';
-  const totalSlots=displaySlots.length;
-  const half=totalSlots/2;
-  if(!half) return;
+  const frameLen=frames.length;
+  if(!frameLen) return;
 
-  let slotIdx=0; // integer slot index, drift-free
+  let frameIdx=0; // integer, drift-free
 
-  // Precache URL promises for all unique slideIds
+  // Precache URL promises
   const urlPromises={};
-  for(const s of displaySlots){
-    if(s && !urlPromises[s.slideId]) urlPromises[s.slideId]=loadSlideImage(s.slideId);
-  }
+  for(const f of frames){ if(!urlPromises[f.slideId]) urlPromises[f.slideId]=loadSlideImage(f.slideId); }
 
   const tick=async()=>{
-    const nextSlot=(slotIdx+step)%half; // wrap after one full copy
-    const wrap=slotIdx+step>=half;
-
-    // Build viewport: cols slots visible
-    // If wrapping, we use slots from the tail of displaySlots (2nd copy)
-    const baseIdx=wrap ? half : 0;
-    const startIdx=nextSlot;
-    const visible=[...displaySlots.slice(startIdx+baseIdx, startIdx+cols+baseIdx)];
-    if(visible.length<cols) visible.push(...displaySlots.slice(baseIdx, baseIdx+(cols-visible.length)));
-
-    // Update cells
+    frameIdx=(frameIdx+step)%frameLen;
     const cells=Array.from(stripEl.querySelectorAll(':scope > .tv-strip-cell'));
+
     for(let c=0;c<cols;c++){
+      const fi=(frameIdx+c)%frameLen;
+      const frame=frames[fi];
+      if(!frame) continue;
+      const slideId=frame.slideId;
+      if(slideId===cellMeta[c]) continue; // no change → skip
+
+      const url=await urlPromises[slideId];
+      if(!url) continue;
+
       const cell=cells[c];
       if(!cell) continue;
-      const slot=visible[c];
-      if(!slot) continue;
-      const url=await urlPromises[slot.slideId];
-      if(!url) continue;
       const outImg=cell.querySelector('.tl-active');
       const inImg=cell.querySelector('.tl-next');
       if(!outImg||!inImg) continue;
-      inImg.src=url;
-      // Run transition on the cell container (not image)
-      await runCellTransition(cell, outImg, inImg, transType, dur);
-    }
 
-    if(wrap){
-      // Reset strip visual position — all cells already show correct images
-      // Update so next tick starts from 0 copy
-      slotIdx=nextSlot;
-    }else{
-      slotIdx=nextSlot;
+      inImg.src=url;
+      await runCellTransition(cell, outImg, inImg, transType, dur);
+      cellMeta[c]=slideId;
     }
   };
 
@@ -398,47 +385,51 @@ async function runCellTransition(cell, outImg, inImg, type, dur){
   const ease=transCfg.easing||'ease';
   cell.classList.add('tl-trans');
   switch(type){
-    case 'fade':
-      outImg.style.transition=`opacity ${dur}ms ${ease}`;
+    case 'fade':{
+      outImg.style.transition='none';
       inImg.style.transition=`opacity ${dur}ms ${ease}`;
-      inImg.style.opacity='0'; inImg.style.zIndex='2';
+      inImg.style.opacity='0';
       requestAnimationFrame(()=>{
         outImg.style.opacity='0';
         inImg.style.opacity='1';
       });
       await new Promise(r=>setTimeout(r,dur));
       break;
+    }
     case 'slide':{
       const dir=transCfg.direction||'left';
-      const shift=(dir==='left'||dir==='up')?1:-1;
+      const axis=(dir==='left'||dir==='right')?'X':'Y';
+      const sign=(dir==='left'||dir==='up')?1:-1;
       outImg.style.transition=`transform ${dur}ms ${ease}`;
       inImg.style.transition=`transform ${dur}ms ${ease}`;
-      inImg.style.transform=(dir==='left')?`translateX(${100*shift}%)`:(dir==='up')?`translateY(${100*shift}%)`:`translateX(${100*shift}%)`;
+      inImg.style.transform=`translate${axis}(${100*sign}%)`;
       requestAnimationFrame(()=>{
-        outImg.style.transform=(dir==='left')?`translateX(${-100*shift}%)`:(dir==='up')?`translateY(${-100*shift}%)`:`translateX(${-100*shift}%)`;
+        outImg.style.transform=`translate${axis}(${-100*sign}%)`;
         inImg.style.transform='translate(0,0)';
       });
       await new Promise(r=>setTimeout(r,dur));
       break;
     }
-    case 'zoom':
+    case 'zoom':{
       outImg.style.transition=`transform ${dur}ms ${ease},opacity ${dur}ms ${ease}`;
       inImg.style.transition=`transform ${dur}ms ${ease},opacity ${dur}ms ${ease}`;
-      inImg.style.transform='scale(0.5)'; inImg.style.opacity='0';
+      inImg.style.transform='scale(0.3)'; inImg.style.opacity='0';
       requestAnimationFrame(()=>{
         outImg.style.transform='scale(1.5)'; outImg.style.opacity='0';
         inImg.style.transform='scale(1)'; inImg.style.opacity='1';
       });
       await new Promise(r=>setTimeout(r,dur));
       break;
-    default:
+    }
+    default:{
       inImg.style.opacity='1'; outImg.style.opacity='0';
       break;
+    }
   }
-  // Swap active classes
+  // Swap classes
   inImg.classList.replace('tl-next','tl-active');
   outImg.classList.replace('tl-active','tl-next');
-  // Reset transforms
+  // Cleanup styles
   outImg.style.transition=''; inImg.style.transition='';
   outImg.style.transform=''; inImg.style.transform='';
   outImg.style.opacity=''; inImg.style.opacity='';
