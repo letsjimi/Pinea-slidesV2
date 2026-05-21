@@ -219,7 +219,7 @@ function startCellAnim(rowIdx, slideIds, cols, step, delay=0){
   rowTimers.push(initial);
 }
 
-/* STRIP ANIMATION — scroll by column-width pixels, seamless looping */
+/* STRIP ANIMATION — position-based tick, no accumulator drift */
 function startStripAnim(stripEl, displayCells, cols, step, delay=0, gap=0){
   const speed=config.slideshowSpeed||5000;
   const dur=transCfg.duration||1200;
@@ -227,44 +227,36 @@ function startStripAnim(stripEl, displayCells, cols, step, delay=0, gap=0){
   const oneRound=totalCells/3;
   if(!oneRound) return;
 
-  let scrollX=0;  // cumulative scroll position in px
+  let stepIndex=0;
 
-  function getRoundWidth(){
+  function getCellBoundaries(){
     const cells=Array.from(stripEl.querySelectorAll(':scope > .tv-strip-cell'));
     const oneRoundCells=cells.slice(0,oneRound);
-    let w=0;
+    let pos=0;
+    const boundaries=[0];
     oneRoundCells.forEach((c,i)=>{
-      w+=c.getBoundingClientRect().width;
-      if(i<oneRoundCells.length-1) w+=(gap||0);
+      pos+=c.getBoundingClientRect().width;
+      if(i<oneRoundCells.length-1) pos+=(gap||0);
+      boundaries.push(pos);
     });
-    return w;
+    return {roundW:pos, boundaries};
   }
 
   const tick=()=>{
-    const containerW=stripEl.parentElement?.clientWidth||stripEl.clientWidth;
-    const colW=containerW/cols;
-    scrollX+=step*colW;
+    const {roundW, boundaries}=getCellBoundaries();
+    stepIndex=(stepIndex+step)%oneRound;
 
-    const roundW=getRoundWidth();
-
-    if(scrollX>=roundW){
-      // Animate to the wrapped position (in the 2nd copy)
-      stripEl.style.transition=`transform ${dur}ms ${transCfg.easing||'ease-in-out'}`;
-      stripEl.style.transform=`translateX(${-scrollX}px)`;
-
-      // After transition, snap back by roundW (invisible jump)
-      setTimeout(()=>{
-        scrollX-=roundW;
-        stripEl.style.transition='none';
-        stripEl.style.transform=`translateX(${-scrollX}px)`;
-        void stripEl.offsetWidth;
-        stripEl.style.transition='';
-      }, dur);
-      return;
-    }
+    let targetX=boundaries[stepIndex]+roundW;
 
     stripEl.style.transition=`transform ${dur}ms ${transCfg.easing||'ease-in-out'}`;
-    stripEl.style.transform=`translateX(${-scrollX}px)`;
+    stripEl.style.transform=`translateX(${-targetX}px)`;
+
+    setTimeout(()=>{
+      stripEl.style.transition='none';
+      stripEl.style.transform=`translateX(${-boundaries[stepIndex]}px)`;
+      void stripEl.offsetWidth;
+      stripEl.style.transition='';
+    }, dur);
   };
 
   const initial=setTimeout(()=>{
