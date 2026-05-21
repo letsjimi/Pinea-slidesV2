@@ -279,112 +279,92 @@ function startStripAnim(stripEl, displayCells, cols, step, delay=0, gap=0){
   rowTimers.push(initial);
 }
 
-/* TIMELINE SCROLL — drift-free frame-based viewport cycling */
+/* TIMELINE SCROLL — strip-based, frame-stepped, span-aware */
 function renderTimelineRow(matrixEl, r, ids, cols, step, delay, gap){
   const rowWrapper=document.createElement('div');
   rowWrapper.className='tv-row tl-viewport';
   rowWrapper.style.cssText=`flex:1;overflow:hidden;position:relative;background:#000;margin-bottom:${(r<(layout.rows||3)-1)?gap+'px':'0'};`;
 
   const spans=layout.timelineSpans?.[r]||[];
-  // Flatten timeline into frames: one frame = one column-width unit
-  // Span>1 duplicates the slideId consecutively
-  const frames=[]; // {slideId} per column unit
-  for(let i=0;i<ids.length;i++){
-    const span=Math.min(spans[i]||1, cols);
-    for(let s=0;s<span;s++) frames.push({slideId:ids[i]});
+  // Triple timeline for seamless wrapping
+  const displayCells=[];
+  for(let round=0; round<3; round++){
+    for(let i=0; i<ids.length; i++){
+      displayCells.push({slideId:ids[i], span:spans[i]||1});
+    }
   }
-  const frameLen=frames.length;
-  if(!frameLen) return;
 
   const strip=document.createElement('div');
-  strip.className='tv-strip';
+  strip.className='tv-strip tl-strip';
   strip.dataset.row=r;
   strip.style.cssText=`display:flex;height:100%;gap:${gap}px;`;
 
-  // Create exactly `cols` cells, each with A/B layers
-  const cellMeta=[]; // track current slideId per cell
-  for(let c=0;c<cols;c++){
+  for(const info of displayCells){
     const cell=document.createElement('div');
     cell.className='tv-strip-cell';
-    cell.style.cssText=`flex:0 0 calc(${100/cols}% - ${gap*(cols-1)/cols}px);height:100%;position:relative;overflow:hidden;box-sizing:border-box;`;
-
-    const layerA=document.createElement('img');
-    const layerB=document.createElement('img');
-    layerA.className='tl-layer tl-active';
-    layerB.className='tl-layer tl-next';
-    [layerA,layerB].forEach(img=>{
-      img.alt=''; img.loading='eager';
-      img.style.cssText='width:100%;height:100%;object-fit:var(--crop-mode,cover);display:block;position:absolute;inset:0;';
-    });
-
-    // Initial content from frames[c % frameLen]
-    const initFrame=frames[c % frameLen];
-    cellMeta[c]=initFrame ? initFrame.slideId : null;
-    if(initFrame) loadSlideImage(initFrame.slideId).then(url=>{ if(url) layerA.src=url; }).catch(()=>{});
-
-    cell.appendChild(layerA); cell.appendChild(layerB);
-    strip.appendChild(cell);
+    const wPct=(Math.min(info.span,cols)/cols)*100;
+    cell.style.cssText=`flex:0 0 ${wPct}%;height:100%;position:relative;overflow:hidden;box-sizing:border-box;`;
+    const img=document.createElement('img');
+    img.alt=''; img.loading='eager';
+    img.style.cssText='width:100%;height:100%;object-fit:var(--crop-mode,cover);display:block;';
+    loadSlideImage(info.slideId).then(url=>{ if(url){ img.src=url; } }).catch(()=>{});
+    cell.appendChild(img); strip.appendChild(cell);
   }
 
   rowWrapper.appendChild(strip);
   matrixEl.appendChild(rowWrapper);
 
-  if(frameLen>0 && ids.length>0){
-    startTimelineScroll(strip, frames, cols, step, delay, cellMeta);
+  if(ids.length>0){
+    startTimelineStripAnim(strip, displayCells, cols, step, delay, gap);
   }
 }
 
-function startTimelineScroll(stripEl, frames, cols, step, delay, cellMeta){
+function startTimelineStripAnim(stripEl, displayCells, cols, step, delay, gap){
   const speed=config.slideshowSpeed||5000;
   const dur=transCfg.duration||1200;
-  const transType=config.transitionType||'fade';
-  const frameLen=frames.length;
-  if(!frameLen) return;
+  const totalCells=displayCells.length;
+  const oneRound=totalCells/3;
+  if(!oneRound) return;
 
-  let frameIdx=0; // integer, drift-free
+  let roundScrollX=0; // accumulated px offset (in first round)
 
-  // Precache URL promises
-  const urlPromises={};
-  for(const f of frames){ if(!urlPromises[f.slideId]) urlPromises[f.slideId]=loadSlideImage(f.slideId); }
-
-  const tick=async()=>{
-    frameIdx=(frameIdx+step)%frameLen;
+  // Width snapshot: pixel offsets of each cell boundary (cumulative)
+  function computeOffsets(){
     const cells=Array.from(stripEl.querySelectorAll(':scope > .tv-strip-cell'));
+    const roundCells=cells.slice(0,oneRound);
+    let off=[0];
+    roundCells.forEach((c,i)=>>{
+      off.push(off[off.length-1]+c.getBoundingClientRect().width+(i<roundCells.length-1?(gap||0):0));
+    });
+    return off; // length = oneRound+1
+  }
 
-    // Collect all changes first (no await in loop = simultaneous)
-    const updates=[];
-    for(let c=0;c<cols;c++){
-      const fi=(frameIdx+c)%frameLen;
-      const frame=frames[fi];
-      if(!frame) continue;
-      const slideId=frame.slideId;
-      if(slideId===cellMeta[c]) continue; // no change → skip
-      updates.push({c,fi,slideId});
-    }
-    if(!updates.length) return;
+  let offsets=computeOffsets();
 
-    // Resolve URLs in parallel
-    const urlMap=new Map();
-    await Promise.all(updates.map(async u=>{
-      const url=await urlPromises[u.slideId];
-      if(url) urlMap.set(u.c, {url, slideId:u.slideId});
-    }));
+  const tick=()=>{
+    // Recalc offsets on first tick / resize (lazy)
+    if(!offsets) offsets=computeOffsets();
+    const maxScroll=offsets[oneRound];
 
-    // Apply all transitions simultaneously
-    const transPromises=[];
-    for(const u of updates){
-      const data=urlMap.get(u.c);
-      if(!data) continue;
-      const cell=cells[u.c];
-      if(!cell) continue;
-      const outImg=cell.querySelector('.tl-active');
-      const inImg=cell.querySelector('.tl-next');
-      if(!outImg||!inImg) continue;
-      inImg.src=data.url;
-      transPromises.push(runCellTransition(cell, outImg, inImg, transType, dur));
-      cellMeta[u.c]=data.slideId;
-    }
-    await Promise.all(transPromises);
+    // Advance by `step` cells
+    const currentCellIdx=Math.round(roundScrollX/(maxScroll/oneRound||1));
+    const nextCellIdx=(currentCellIdx+step)%oneRound;
+    roundScrollX=offsets[nextCellIdx];
+
+    const stripW=stripEl.scrollWidth; // entire 3x strip width
+
+    // If position is near the end, snap back to the same logical position in the first copy (seamless)
+    // We are showing 3x copies. The wrap point is at ~oneRound cells in.
+    // The visible offset within the strip = roundScrollX (in first round) + roundW per copy number.
+    let visibleX=roundScrollX;
+
+    // Ensure we stay in the middle copy for wrapping safety
+    // Copy 0: [0..roundW), Copy 1: [roundW..2*roundW), Copy 2: [2*roundW..3*roundW)
+    const middleCopyStart=offsets[oneRound];
+    visibleX+=middleCopyStart;
+
+    stripEl.style.transition=`transform ${dur}ms ${transCfg.easing||'ease-in-out'}`;
+    stripEl.style.transform=`translateX(${-visibleX}px)`;
   };
 
   const initial=setTimeout(()=>{

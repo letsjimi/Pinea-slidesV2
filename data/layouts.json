@@ -50,7 +50,7 @@
       "timeline"
     ],
     "rowSteps": [
-      2,
+      1,
       2,
       2
     ],
@@ -70,7 +70,7 @@
       4000
     ],
     "cellGap": 4,
-    "rotation": 0,
+    "rotation": -90,
     "rowLabels": [
       "",
       "",

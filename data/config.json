@@ -10,7 +10,8 @@
   "transitionType": "slide",
   "transitionSettings": {
     "duration": 1200,
-    "easing": "ease-in-out"
+    "easing": "ease",
+    "direction": "left"
   },
   "showGroupLabel": true,
   "groupLabelPos": "bottom",
@@ -21,5 +22,5 @@
   "idleTimeout": 0,
   "slideshowSpeed": 5000,
   "refreshInterval": "1m",
-  "lastModified": 1779359981452
+  "lastModified": 1779362466132
 }
