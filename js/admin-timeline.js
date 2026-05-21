@@ -349,9 +349,10 @@ function renderAllRows() {
           <select onchange="window.updateRowMode(${ri},this.value)" style="width:auto;min-width:120px;">
             <option value="cell" ${mode==='cell'?'selected':''}>Zellen-Wechsel</option>
             <option value="strip" ${mode==='strip'?'selected':''}>Scroll-Streifen</option>
+            <option value="timeline" ${mode==='timeline'?'selected':''}>Timeline-Scroll</option>
           </select>
         </div>
-        <div class="form-row" style="margin:0;gap:6px;"><label style="min-width:auto;white-space:nowrap;">${mode==='strip'?'Strip-Schritt':'Zellen-Schritt'}:</label>
+        <div class="form-row" style="margin:0;gap:6px;"><label style="min-width:auto;white-space:nowrap;">${mode==='strip'||mode==='timeline'?'Strip/Timeline-Schritt':'Zellen-Schritt'}:</label>
           <input type="number" value="${step}" min="1" max="10" style="width:64px;" onchange="window.updateRowStep(${ri},this.value)">
         </div>
         <div class="form-row" style="margin:0;gap:6px;"><label style="min-width:auto;white-space:nowrap;">Stagger (ms):</label>
