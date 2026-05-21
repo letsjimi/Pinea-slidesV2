@@ -383,8 +383,12 @@ function applyTransition(img, newUrl, oldSrc, type, dur){
       img.style.transform='translateX(-100%)';
       setTimeout(()=>{
         cleanup(); img.src=newUrl;
+        img.style.transition='none';
         img.style.transform='translateX(100%)';
-        requestAnimationFrame(()=>img.style.transform='translateX(0)');
+        requestAnimationFrame(()=>{
+          img.style.transition=`transform ${dur}ms ${ease}`;
+          img.style.transform='translateX(0)';
+        });
       }, dur);
       break;
     }
