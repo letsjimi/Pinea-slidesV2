@@ -13,7 +13,7 @@ export async function initTV(tv) {
     rows:3, cols:2, timelines:[[],[],[]],
     rowAnimationModes:['cell','cell','cell'],
     rowSteps:[1,1,1], stripSteps:[1,1,1],
-    rowCellGaps:[4,4,4], useMatrix:true, rowOffsets:[0,2000,4000]
+    rowCellGaps:[4,4,4], useMatrix:true, rowOffsets:[0,2000,4000], slotSpans:[]
   };
   applyConfig(); await render();
   if(config.idleTimeout>0) setupIdle();
@@ -31,12 +31,16 @@ function applyConfig() {
   if(container && layout.rotation){
     const rot=layout.rotation;
     if(rot===90 || rot===-90){
-      const vw=window.innerWidth, vh=window.innerHeight;
-      // Nach 90°-Rotation tauschen sich Breite/Höhe:
-      // Container-Breite (wird zur Viewport-Höhe) = vh
-      // Container-Höhe  (wird zur Viewport-Breite) = vw
-      container.style.cssText=`position:fixed;left:50%;top:50%;width:${vh}px;height:${vw}px;transform:translate(-50%,-50%) rotate(${rot}deg);transform-origin:center center;`;
-      document.body.classList.add('tv-rotated');
+      const inIframe=window.self!==window.top;
+      if(inIframe){
+        // Preview iframe: simpler sizing to avoid vw/vh clipping in small frame
+        container.style.cssText=`width:100%;height:100%;transform:rotate(${rot}deg);transform-origin:center center;`;
+        document.body.classList.add('tv-rotated');
+      }else{
+        const vw=window.innerWidth, vh=window.innerHeight;
+        container.style.cssText=`position:fixed;left:50%;top:50%;width:${vh}px;height:${vw}px;transform:translate(-50%,-50%) rotate(${rot}deg);transform-origin:center center;`;
+        document.body.classList.add('tv-rotated');
+      }
     }else{
       container.style.cssText='';
       document.body.classList.remove('tv-rotated');
@@ -119,17 +123,18 @@ function renderMatrix() {
       const strip=document.createElement('div');
       strip.className='tv-strip';
       strip.dataset.row=r;
-      strip.style.cssText=`display:flex;height:100%;`;
+      strip.style.cssText=`display:flex;height:100%;gap:${rowGap}px;`;
       const displayIds=[...ids,...ids,...ids];
+      const spans=(layout.slotSpans?.[r])||[];
 
       for(let i=0;i<displayIds.length;i++){
         const slideId=displayIds[i];
+        const spanIdx=i%ids.length;
+        const span=(typeof spans[spanIdx]==='number' && spans[spanIdx]>0) ? Math.min(spans[spanIdx], cols) : 1;
         const cell=document.createElement('div');
         cell.className='tv-strip-cell';
-        // Balken als padding-right — Hintergrund des rowWrapper ist schwarz, also sichtbar
-        const isLastInBlock=(i+1)%cols===0;
-        const padRight=isLastInBlock?0:rowGap;
-        cell.style.cssText=`width:calc(100%/${cols});height:100%;flex-shrink:0;position:relative;overflow:hidden;padding-right:${padRight}px;box-sizing:border-box;`;
+        const widthPct=(span/cols)*100;
+        cell.style.cssText=`width:${widthPct}%;height:100%;flex-shrink:0;position:relative;overflow:hidden;box-sizing:border-box;`;
         const img=document.createElement('img');
         img.alt=''; img.loading='eager';
         img.style.cssText='width:100%;height:100%;object-fit:var(--crop-mode,cover);display:block;';
@@ -145,16 +150,27 @@ function renderMatrix() {
         startStripAnim(strip, ids, cols, step, delay, rowGap);
       }
     }else{
-      for(let c=0;c<cols;c++){
-        const cell=document.createElement('div');
-        cell.className='tv-cell';
-        cell.dataset.row=r; cell.dataset.col=c;
-        cell.style.cssText='position:relative;background:#000;overflow:hidden;';
-        const img=document.createElement('img');
-        img.alt=''; img.loading='eager';
-        img.style.cssText='width:100%;height:100%;object-fit:var(--crop-mode,cover);display:block;transition:opacity 0.5s ease;opacity:0;';
-        if(hasImages){
-          const slideId=ids[c%ids.length];
+      // Cell row as sub-grid with span support
+      const rowGrid=document.createElement('div');
+      rowGrid.className='tv-row-grid';
+      rowGrid.dataset.row=r;
+      rowGrid.style.cssText=`display:grid;grid-template-columns:repeat(${cols},1fr);gap:${rowGap}px;flex:1;min-height:0;overflow:hidden;align-content:stretch;`;
+
+      if(hasImages){
+        const spans=(layout.slotSpans?.[r])||[];
+        for(let si=0; si<ids.length; si++){
+          const span=(typeof spans[si]==='number' && spans[si]>0) ? Math.min(spans[si], cols) : 1;
+          const cell=document.createElement('div');
+          cell.className='tv-cell';
+          cell.dataset.row=r;
+          cell.dataset.slot=si;
+          cell.style.cssText='position:relative;background:#000;overflow:hidden;';
+          if(span>1) cell.style.gridColumn=`span ${span}`;
+
+          const img=document.createElement('img');
+          img.alt=''; img.loading='eager';
+          img.style.cssText='width:100%;height:100%;object-fit:var(--crop-mode,cover);display:block;transition:opacity 0.5s ease;opacity:0;';
+          const slideId=ids[si];
           loadSlideImage(slideId).then(url=>{
             if(url){
               img.src=url;
@@ -163,9 +179,12 @@ function renderMatrix() {
               if(img.complete) show();
             }
           }).catch(()=>{});
+          cell.appendChild(img);
+          rowGrid.appendChild(cell);
         }
-        cell.appendChild(img); matrix.appendChild(cell);
       }
+
+      matrix.appendChild(rowGrid);
 
       if(hasImages){
         const delay=layout.rowOffsets?.[r] || 0;
@@ -176,28 +195,70 @@ function renderMatrix() {
   container.appendChild(matrix);
 }
 
-/* CELL ANIMATION */
+/* CELL ANIMATION — window-based using slotSpans */
 function startCellAnim(rowIdx, slideIds, cols, step, delay=0){
   const speed=config.slideshowSpeed||5000;
   const dur=transCfg.duration||1200;
   const transType=config.transitionType||'fade';
-  let offset=0;
+  const spans=(layout.slotSpans?.[rowIdx])||[];
+
+  // Calculate total colspan occupied by all slots in this timeline.
+  // If the whole timeline fits in one row, skip animation entirely (static display).
+  let totalUsedCols=0;
+  for(let i=0;i<slideIds.length;i++){
+    const sp=(typeof spans[i]==='number' && spans[i]>0)?Math.min(spans[i],cols):1;
+    totalUsedCols+=sp;
+  }
+  const isSingleScreen=(slideIds.length===0)||(totalUsedCols<=cols);
+  if(isSingleScreen) return; // no animation: everything fits in one row
+
+  // Build a "window" of slot indices that fit in one grid row starting from startIdx
+  function getWindowSlots(startIdx){
+    let used=0;
+    const res=[];
+    for(let i=0;i<slideIds.length&&used<cols;i++){
+      const realIdx=(startIdx+i)%slideIds.length;
+      const sp=(typeof spans[realIdx]==='number' && spans[realIdx]>0)?Math.min(spans[realIdx],cols):1;
+      if(used+sp>cols) break;
+      res.push(realIdx);
+      used+=sp;
+    }
+    return res;
+  }
+
+  let windowStart=0;
 
   const tick=async()=>{
     if(!slideIds.length) return;
-    offset=(offset+step)%slideIds.length;
-    const matrix=document.querySelector('.tv-matrix'); if(!matrix) return;
-    const allCells=matrix.querySelectorAll('.tv-cell');
-    const rowCells=[];
-    for(let c=0;c<cols;c++) rowCells.push(allCells[rowIdx*cols+c]);
+    const matrix=document.querySelector('.tv-matrix');
+    if(!matrix) return;
+    const rowGrids=matrix.querySelectorAll('.tv-row-grid');
+    const rowGrid=rowGrids[rowIdx];
+    if(!rowGrid) return;
+    const cells=rowGrid.querySelectorAll('.tv-cell');
 
-    for(let c=0;c<cols;c++){
-      const idx=(offset+c)%slideIds.length;
-      const url=await loadSlideImage(slideIds[idx]);
+    const slotIndices=getWindowSlots(windowStart);
+
+    for(let wi=0; wi<slotIndices.length; wi++){
+      const slotIdx=slotIndices[wi];
+      const sourceIdx=(slotIdx+step)%slideIds.length;
+      const url=await loadSlideImage(slideIds[sourceIdx]);
       if(!url) continue;
-      const img=rowCells[c]?.querySelector('img');
+      let targetCell=null;
+      for(const c of cells){
+        if(parseInt(c.dataset.slot)===slotIdx){ targetCell=c; break; }
+      }
+      if(!targetCell) continue;
+      const img=targetCell.querySelector('img');
       if(!img) continue;
       applyTransition(img, url, img.src, transType, dur);
+    }
+
+    if(slotIndices.length){
+      const last=slotIndices[slotIndices.length-1];
+      windowStart=(last+1)%slideIds.length;
+    } else {
+      windowStart=(windowStart+1)%slideIds.length;
     }
   };
 
@@ -209,12 +270,30 @@ function startCellAnim(rowIdx, slideIds, cols, step, delay=0){
   rowTimers.push(initial);
 }
 
-/* STRIP ANIMATION */
+/* STRIP ANIMATION — supports variable cell widths via slotSpans */
 function startStripAnim(stripEl, slideIds, cols, step, delay=0, gap=0){
   const speed=config.slideshowSpeed||5000;
   const dur=transCfg.duration||1200;
   const total=slideIds.length;
   if(!total) return;
+
+  const spans=(layout.slotSpans?.[parseInt(stripEl.dataset.row)])||[];
+  const getSpan=(idx)=>{
+    const si=idx%total;
+    return (typeof spans[si]==='number' && spans[si]>0) ? Math.min(spans[si], cols) : 1;
+  };
+
+  const blockWidth=()=>stripEl.parentElement?.clientWidth||stripEl.clientWidth;
+
+  // Cumulative width up to (but not including) slot idx
+  function cumWidth(idx){
+    let w=0;
+    for(let i=0;i<idx;i++){
+      w += blockWidth() * (getSpan(i)/cols);
+      w += gap; // flex gap between cells
+    }
+    return w;
+  }
 
   let offset=0;
 
@@ -223,9 +302,7 @@ function startStripAnim(stripEl, slideIds, cols, step, delay=0, gap=0){
     const nextOffset=rawNext%total;
     const isWrapping=rawNext>=total;
 
-    const blockWidth=stripEl.parentElement?.clientWidth||stripEl.clientWidth;
-    const cellWidth=blockWidth/cols; // Eine Zelle = Viewport / cols (inkl. Padding/Balken)
-    const targetX=-rawNext*cellWidth;
+    const targetX=-cumWidth(rawNext);
 
     stripEl.style.transition=`transform ${dur}ms ${transCfg.easing||'ease-in-out'}`;
     stripEl.style.transform=`translateX(${targetX}px)`;
@@ -233,7 +310,7 @@ function startStripAnim(stripEl, slideIds, cols, step, delay=0, gap=0){
     if(isWrapping){
       setTimeout(()=>{
         stripEl.style.transition='none';
-        stripEl.style.transform=`translateX(${-nextOffset*cellWidth}px)`;
+        stripEl.style.transform=`translateX(${-cumWidth(nextOffset)}px)`;
         requestAnimationFrame(()=>{ stripEl.style.transition=''; });
       }, dur);
     }
