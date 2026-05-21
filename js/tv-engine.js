@@ -122,9 +122,9 @@ function renderMatrix() {
       rowWrapper.style.cssText=`flex:1;overflow:hidden;position:relative;background:#000;margin-bottom:${(r<rows-1)?rowGap+'px':'0'};`;
 
       const spans=(layout.timelineSpans?.[r])||[];
-      // Build flat displayCells — triple the timeline for seamless looping
+      // Build flat displayCells — ten copies for ultra-long seamless looping
       const displayCells=[];
-      for(let round=0; round<3; round++){
+      for(let round=0; round<10; round++){
         for(let i=0; i<ids.length; i++){
           displayCells.push({slideId:ids[i], span:spans[i]||1});
         }
@@ -219,44 +219,47 @@ function startCellAnim(rowIdx, slideIds, cols, step, delay=0){
   rowTimers.push(initial);
 }
 
-/* STRIP ANIMATION — position-based tick, no accumulator drift */
+/* STRIP ANIMATION — 10× copies, drift-free with effective cell width */
 function startStripAnim(stripEl, displayCells, cols, step, delay=0, gap=0){
   const speed=config.slideshowSpeed||5000;
   const dur=transCfg.duration||1200;
   const totalCells=displayCells.length;
-  const oneRound=totalCells/3;
+  const oneRound=totalCells/10;
   if(!oneRound) return;
 
-  let stepIndex=0;
+  let scrollX=0;
 
-  function getCellBoundaries(){
+  function getRoundWidth(){
     const cells=Array.from(stripEl.querySelectorAll(':scope > .tv-strip-cell'));
     const oneRoundCells=cells.slice(0,oneRound);
-    let pos=0;
-    const boundaries=[0];
+    let w=0;
     oneRoundCells.forEach((c,i)=>{
-      pos+=c.getBoundingClientRect().width;
-      if(i<oneRoundCells.length-1) pos+=(gap||0);
-      boundaries.push(pos);
+      w+=c.getBoundingClientRect().width;
+      if(i<oneRoundCells.length-1) w+=(gap||0);
     });
-    return {roundW:pos, boundaries};
+    return w;
   }
 
   const tick=()=>{
-    const {roundW, boundaries}=getCellBoundaries();
-    stepIndex=(stepIndex+step)%oneRound;
+    const roundW=getRoundWidth();
+    const effectiveCellW=roundW/oneRound;
+    scrollX+=step*effectiveCellW;
 
-    let targetX=boundaries[stepIndex]+roundW;
+    if(scrollX>=roundW*9){
+      stripEl.style.transition=`transform ${dur}ms ${transCfg.easing||'ease-in-out'}`;
+      stripEl.style.transform=`translateX(${-scrollX}px)`;
+      setTimeout(()=>{
+        scrollX-=roundW*9;
+        stripEl.style.transition='none';
+        stripEl.style.transform=`translateX(${-scrollX}px)`;
+        void stripEl.offsetWidth;
+        stripEl.style.transition='';
+      }, dur);
+      return;
+    }
 
     stripEl.style.transition=`transform ${dur}ms ${transCfg.easing||'ease-in-out'}`;
-    stripEl.style.transform=`translateX(${-targetX}px)`;
-
-    setTimeout(()=>{
-      stripEl.style.transition='none';
-      stripEl.style.transform=`translateX(${-boundaries[stepIndex]}px)`;
-      void stripEl.offsetWidth;
-      stripEl.style.transition='';
-    }, dur);
+    stripEl.style.transform=`translateX(${-scrollX}px)`;
   };
 
   const initial=setTimeout(()=>{
