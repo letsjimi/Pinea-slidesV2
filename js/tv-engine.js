@@ -98,11 +98,11 @@ function renderMatrix() {
 
   if(isMixedModes){
     matrix.style.cssText=`display:flex;flex-direction:column;position:absolute;inset:0;z-index:1;`;
-  }else{
-    const firstMode=(layout.rowAnimationModes?.[0])||'cell';
-    if(firstMode==='strip'){
-      matrix.style.cssText=`display:flex;flex-direction:column;position:absolute;inset:0;z-index:1;`;
     }else{
+      const firstMode=(layout.rowAnimationModes?.[0])||'cell';
+      if(firstMode==='strip' || firstMode==='timeline'){
+        matrix.style.cssText=`display:flex;flex-direction:column;position:absolute;inset:0;z-index:1;`;
+      }else{
       const globalGap=layout.cellGap||4;
       matrix.style.cssText=`display:grid;grid-template-rows:repeat(${rows},1fr);grid-template-columns:repeat(${cols},1fr);gap:${globalGap}px;position:absolute;inset:0;z-index:1;`;
     }
@@ -282,7 +282,7 @@ function startStripAnim(stripEl, displayCells, cols, step, delay=0, gap=0){
 /* TIMELINE SCROLL — drift-free frame-based viewport cycling */
 function renderTimelineRow(matrixEl, r, ids, cols, step, delay, gap){
   const rowWrapper=document.createElement('div');
-  rowWrapper.className='tv-row timeline-row';
+  rowWrapper.className='tv-row tl-viewport';
   rowWrapper.style.cssText=`flex:1;overflow:hidden;position:relative;background:#000;margin-bottom:${(r<(layout.rows||3)-1)?gap+'px':'0'};`;
 
   const spans=layout.timelineSpans?.[r]||[];
@@ -351,26 +351,40 @@ function startTimelineScroll(stripEl, frames, cols, step, delay, cellMeta){
     frameIdx=(frameIdx+step)%frameLen;
     const cells=Array.from(stripEl.querySelectorAll(':scope > .tv-strip-cell'));
 
+    // Collect all changes first (no await in loop = simultaneous)
+    const updates=[];
     for(let c=0;c<cols;c++){
       const fi=(frameIdx+c)%frameLen;
       const frame=frames[fi];
       if(!frame) continue;
       const slideId=frame.slideId;
       if(slideId===cellMeta[c]) continue; // no change → skip
+      updates.push({c,fi,slideId});
+    }
+    if(!updates.length) return;
 
-      const url=await urlPromises[slideId];
-      if(!url) continue;
+    // Resolve URLs in parallel
+    const urlMap=new Map();
+    await Promise.all(updates.map(async u=>{
+      const url=await urlPromises[u.slideId];
+      if(url) urlMap.set(u.c, {url, slideId:u.slideId});
+    }));
 
-      const cell=cells[c];
+    // Apply all transitions simultaneously
+    const transPromises=[];
+    for(const u of updates){
+      const data=urlMap.get(u.c);
+      if(!data) continue;
+      const cell=cells[u.c];
       if(!cell) continue;
       const outImg=cell.querySelector('.tl-active');
       const inImg=cell.querySelector('.tl-next');
       if(!outImg||!inImg) continue;
-
-      inImg.src=url;
-      await runCellTransition(cell, outImg, inImg, transType, dur);
-      cellMeta[c]=slideId;
+      inImg.src=data.url;
+      transPromises.push(runCellTransition(cell, outImg, inImg, transType, dur));
+      cellMeta[u.c]=data.slideId;
     }
+    await Promise.all(transPromises);
   };
 
   const initial=setTimeout(()=>{
