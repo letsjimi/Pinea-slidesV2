@@ -219,59 +219,53 @@ function startCellAnim(rowIdx, slideIds, cols, step, delay=0){
   rowTimers.push(initial);
 }
 
-/* STRIP ANIMATION — pixel-perfect infinite loop via position lookup table */
+/* STRIP ANIMATION — scroll by column-width pixels, seamless looping */
 function startStripAnim(stripEl, displayCells, cols, step, delay=0, gap=0){
   const speed=config.slideshowSpeed||5000;
   const dur=transCfg.duration||1200;
   const totalCells=displayCells.length;
-  const perRound=totalCells/3;
-  if(!perRound) return;
+  const oneRound=totalCells/3;
+  if(!oneRound) return;
 
-  // 1) Build position lookup table for one round (pixel-exact)
-  const containerW=stripEl.parentElement?.clientWidth||stripEl.clientWidth;
-  const colW=containerW/cols;
-  const roundW=perRound===1
-    ? (colW*(displayCells[0]?.span||1))
-    : displayCells.slice(0,perRound).reduce((sum,cell,i,arr)=>sum+colW*(cell.span||1)+(i<arr.length-1?(gap||0):0),0);
+  let scrollX=0;  // cumulative scroll position in px
 
-  // Pre-calculate each cell's exact starting position within one round
-  const positions=[0]; // positions[0]=0
-  for(let i=0;i<perRound;i++){
-    const w=colW*(displayCells[i]?.span||1);
-    const g=(i<perRound-1)?(gap||0):0;
-    positions.push(positions[positions.length-1]+w+g);
+  function getRoundWidth(){
+    const cells=Array.from(stripEl.querySelectorAll(':scope > .tv-strip-cell'));
+    const oneRoundCells=cells.slice(0,oneRound);
+    let w=0;
+    oneRoundCells.forEach((c,i)=>{
+      w+=c.getBoundingClientRect().width;
+      if(i<oneRoundCells.length-1) w+=(gap||0);
+    });
+    return w;
   }
-  // positions now has perRound+1 entries: [p0, p1, ... pN=roundW]
-
-  let stepIdx=0; // which position we're at (0..perRound-1)
-
-  // 2) Helper: true modulo for negative/zero
-  const mod=(a,m)=>((a%m)+m)%m;
 
   const tick=()=>{
-    // advance stepIdx by `step` positions (mod perRound)
-    // step=1 means move to next cell, step=2 means skip one, etc.
-    stepIdx=mod(stepIdx+step, perRound);
+    const containerW=stripEl.parentElement?.clientWidth||stripEl.clientWidth;
+    const colW=containerW/cols;
+    scrollX+=step*colW;
 
-    // We want to be at the 2nd copy (perRound..2*perRound-1) for infinite illusion
-    const virtualPos=positions[stepIdx]+roundW; // 2nd copy
+    const roundW=getRoundWidth();
 
-    // Transition smoothly to virtualPos
+    if(scrollX>=roundW){
+      // Animate to the wrapped position (in the 2nd copy)
+      stripEl.style.transition=`transform ${dur}ms ${transCfg.easing||'ease-in-out'}`;
+      stripEl.style.transform=`translateX(${-scrollX}px)`;
+
+      // After transition, snap back by roundW (invisible jump)
+      setTimeout(()=>{
+        scrollX-=roundW;
+        stripEl.style.transition='none';
+        stripEl.style.transform=`translateX(${-scrollX}px)`;
+        void stripEl.offsetWidth;
+        stripEl.style.transition='';
+      }, dur);
+      return;
+    }
+
     stripEl.style.transition=`transform ${dur}ms ${transCfg.easing||'ease-in-out'}`;
-    stripEl.style.transform=`translateX(${-virtualPos}px)`;
-
-    // After transition completes: instant snap to 1st copy at same visual position
-    // (the 1st copy at positions[stepIdx] looks EXACTLY the same as 2nd copy at virtualPos)
-    setTimeout(()=>{
-      stripEl.style.transition='none';
-      stripEl.style.transform=`translateX(${-positions[stepIdx]}px)`;
-      void stripEl.offsetWidth;
-      stripEl.style.transition='';
-    }, dur+10); // +10ms safety buffer
+    stripEl.style.transform=`translateX(${-scrollX}px)`;
   };
-
-  // Initial: start at 1st copy, position 0
-  stripEl.style.transform='translateX(0px)';
 
   const initial=setTimeout(()=>{
     tick();
@@ -280,6 +274,8 @@ function startStripAnim(stripEl, displayCells, cols, step, delay=0, gap=0){
   }, delay);
   rowTimers.push(initial);
 }
+
+/* SLIDESHOW */
 function renderSlideshow() {
   const a=document.getElementById('slideA'), b=document.getElementById('slideB');
   if(!a||!b){ console.error('[TV] slideA/B nicht gefunden'); return; }

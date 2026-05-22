@@ -219,59 +219,58 @@ function startCellAnim(rowIdx, slideIds, cols, step, delay=0){
   rowTimers.push(initial);
 }
 
-/* STRIP ANIMATION — pixel-perfect infinite loop via position lookup table */
+/* STRIP ANIMATION — scroll by column-width pixels, seamless looping */
 function startStripAnim(stripEl, displayCells, cols, step, delay=0, gap=0){
   const speed=config.slideshowSpeed||5000;
   const dur=transCfg.duration||1200;
   const totalCells=displayCells.length;
-  const perRound=totalCells/3;
-  if(!perRound) return;
+  const oneRound=totalCells/3;
+  if(!oneRound) return;
 
-  // 1) Build position lookup table for one round (pixel-exact)
+  // Pre-calculate widths based on spans to avoid DOM measurements
   const containerW=stripEl.parentElement?.clientWidth||stripEl.clientWidth;
   const colW=containerW/cols;
-  const roundW=perRound===1
-    ? (colW*(displayCells[0]?.span||1))
-    : displayCells.slice(0,perRound).reduce((sum,cell,i,arr)=>sum+colW*(cell.span||1)+(i<arr.length-1?(gap||0):0),0);
-
-  // Pre-calculate each cell's exact starting position within one round
-  const positions=[0]; // positions[0]=0
-  for(let i=0;i<perRound;i++){
-    const w=colW*(displayCells[i]?.span||1);
-    const g=(i<perRound-1)?(gap||0):0;
-    positions.push(positions[positions.length-1]+w+g);
-  }
-  // positions now has perRound+1 entries: [p0, p1, ... pN=roundW]
-
-  let stepIdx=0; // which position we're at (0..perRound-1)
-
-  // 2) Helper: true modulo for negative/zero
-  const mod=(a,m)=>((a%m)+m)%m;
+  const cellWidths=displayCells.slice(0,oneRound).map(cell=>colW*(cell.span||1)+(gap||0));
+  // Adjust last cell to not include gap
+  if(cellWidths.length>0) cellWidths[cellWidths.length-1]-=(gap||0);
+  const roundW=cellWidths.reduce((a,b)=>a+b,0);
+  
+  let scrollX=0;  // cumulative scroll position in px
+  let totalSteps=0; // track actual steps for precise positioning
 
   const tick=()=>{
-    // advance stepIdx by `step` positions (mod perRound)
-    // step=1 means move to next cell, step=2 means skip one, etc.
-    stepIdx=mod(stepIdx+step, perRound);
+    // For span > 1 stability, we need to track actual cell positions
+    const cellsToMove=Math.min(step, oneRound);
+    let scrollAmount=0;
+    
+    // Calculate scroll amount based on actual cell widths rather than estimated column widths
+    for(let i=0;i<cellsToMove;i++){
+      const cellIndex=(totalSteps+i)%oneRound;
+      scrollAmount+=cellWidths[cellIndex]||colW;
+    }
+    
+    scrollX+=scrollAmount;
+    totalSteps+=cellsToMove;
 
-    // We want to be at the 2nd copy (perRound..2*perRound-1) for infinite illusion
-    const virtualPos=positions[stepIdx]+roundW; // 2nd copy
+    if(scrollX>=roundW){
+      // Animate to the wrapped position (in the 2nd copy)
+      stripEl.style.transition=`transform ${dur}ms ${transCfg.easing||"ease-in-out"}`;
+      stripEl.style.transform=`translateX(${-scrollX}px)`;
 
-    // Transition smoothly to virtualPos
-    stripEl.style.transition=`transform ${dur}ms ${transCfg.easing||'ease-in-out'}`;
-    stripEl.style.transform=`translateX(${-virtualPos}px)`;
+      // After transition, snap back by roundW (invisible jump)
+      setTimeout(()=>{
+        scrollX-=roundW;
+        stripEl.style.transition="none";
+        stripEl.style.transform=`translateX(${-scrollX}px)`;
+        void stripEl.offsetWidth;
+        stripEl.style.transition="";
+      }, dur);
+      return;
+    }
 
-    // After transition completes: instant snap to 1st copy at same visual position
-    // (the 1st copy at positions[stepIdx] looks EXACTLY the same as 2nd copy at virtualPos)
-    setTimeout(()=>{
-      stripEl.style.transition='none';
-      stripEl.style.transform=`translateX(${-positions[stepIdx]}px)`;
-      void stripEl.offsetWidth;
-      stripEl.style.transition='';
-    }, dur+10); // +10ms safety buffer
+    stripEl.style.transition=`transform ${dur}ms ${transCfg.easing||"ease-in-out"}`;
+    stripEl.style.transform=`translateX(${-scrollX}px)`;
   };
-
-  // Initial: start at 1st copy, position 0
-  stripEl.style.transform='translateX(0px)';
 
   const initial=setTimeout(()=>{
     tick();
