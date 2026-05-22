@@ -245,7 +245,7 @@ function startStripAnim(stripEl, displayCells, cols, step, delay=0, gap=0){
     let pos=0;
     const arr=[];
     for(let i=0;i<state.perRound;i++){
-      const w=state.cells[i]?state.cells[i].offsetWidth:0; // offsetWidth is rotation-safe
+      const w=state.cells[i]?state.cells[i].getBoundingClientRect().width:0;
       arr.push(pos);
       pos+=w+state.gap;
     }
