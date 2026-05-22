@@ -243,7 +243,7 @@ function startStripAnim(stripEl, displayCells, cols, step, delay=0, gap=0){
   let pos=0;
   const g=(gap||0);
   for(let i=0;i<perRound;i++){
-    const w=cells[i]?cells[i].getBoundingClientRect().width:0;
+    const w=cells[i]?cells[i].offsetWidth:0; // use offsetWidth (rotation-safe, not getBoundingClientRect)
     imagePositions.push(pos);
     pos+=w+g;
   }
