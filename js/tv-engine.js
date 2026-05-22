@@ -238,17 +238,30 @@ function startStripAnim(stripEl, displayCells, cols, step, delay=0, gap=0){
 
   const cells=stripEl.querySelectorAll('.tv-strip-cell');
 
-  // Build IMAGE-BASED position lookup (left edge of every image in one round)
-  const imagePositions=[];
-  let pos=0;
-  const g=(gap||0);
-  for(let i=0;i<perRound;i++){
-    const w=cells[i]?cells[i].offsetWidth:0; // use offsetWidth (rotation-safe, not getBoundingClientRect)
-    imagePositions.push(pos);
-    pos+=w+g;
+  // Mutable state so we can remeasure on resize
+  const state={cells, gap:(gap||0), perRound, imagePositions:[], roundW:0};
+
+  function measure(){
+    let pos=0;
+    const arr=[];
+    for(let i=0;i<state.perRound;i++){
+      const w=state.cells[i]?state.cells[i].offsetWidth:0; // offsetWidth is rotation-safe
+      arr.push(pos);
+      pos+=w+state.gap;
+    }
+    state.imagePositions=arr;
+    state.roundW=pos; // distance from image 0 to image 0 of next copy (includes trailing gap)
   }
-  const roundW=pos; // distance from image 0 to image 0 of next copy (includes trailing gap)
-  if(roundW<=0) return;
+  measure();
+  if(state.roundW<=0) return;
+
+  // ResizeObserver: remeasure when row size changes so deltas stay pixel-perfect
+  if(typeof ResizeObserver!=='undefined'){
+    const ro=new ResizeObserver(()=>{
+      measure();
+    });
+    if(stripEl.parentElement) ro.observe(stripEl.parentElement);
+  }
 
   // Step = number of images to advance per tick (never more than perRound)
   const imageStep=Math.max(1, Math.min(step, perRound));
@@ -267,10 +280,10 @@ function startStripAnim(stripEl, displayCells, cols, step, delay=0, gap=0){
     // Calculate calm forward delta (never a big roundW jump)
     let delta;
     if(imageIdx>=prevImageIdx){
-      delta=imagePositions[imageIdx]-imagePositions[prevImageIdx];
+      delta=state.imagePositions[imageIdx]-state.imagePositions[prevImageIdx];
     }else{
       // Wrapped around end of timeline: to end + from start
-      delta=(roundW-imagePositions[prevImageIdx])+imagePositions[imageIdx];
+      delta=(state.roundW-state.imagePositions[prevImageIdx])+state.imagePositions[imageIdx];
     }
 
     absPos+=delta;
@@ -282,8 +295,8 @@ function startStripAnim(stripEl, displayCells, cols, step, delay=0, gap=0){
     // After transition: if we've entered the 3rd copy, snap back by roundW
     snapTimer=setTimeout(()=>{
       snapTimer=null;
-      if(absPos>=roundW*2){
-        absPos-=roundW;
+      if(absPos>=state.roundW*2){
+        absPos-=state.roundW;
         stripEl.style.transition='none';
         stripEl.style.transform=`translateX(${-absPos}px)`;
         void stripEl.offsetWidth;
