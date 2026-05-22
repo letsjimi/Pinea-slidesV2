@@ -228,7 +228,7 @@ function startCellAnim(rowIdx, slideIds, cols, step, delay=0){
   rowTimers.push(initial);
 }
 
-/* STRIP ANIMATION — calm infinite loop, scrolls by small delta each tick */
+/* STRIP ANIMATION — calm infinite loop, scrolls by whole-image delta each tick */
 function startStripAnim(stripEl, displayCells, cols, step, delay=0, gap=0){
   const speed=config.slideshowSpeed||5000;
   const dur=transCfg.duration||1200;
@@ -236,30 +236,24 @@ function startStripAnim(stripEl, displayCells, cols, step, delay=0, gap=0){
   const perRound=totalCells/3;
   if(!perRound) return;
 
-  // Ruhiger Lauf: nie mehr als die sichtbare Breite auf einmal scrollen.
-  // Korrektur für span>1: step bezieht sich auf ganze Bilder, nicht auf Slots.
-  // Wir multiplizieren mit baseSpan, damit wir immer an Bildgrenzen landen.
-  const baseSpan = (displayCells[0]?.span) || 1;
-  const effectiveStep = Math.max(1, Math.min(step, Math.floor(cols / baseSpan))) * baseSpan;
-
   const cells=stripEl.querySelectorAll('.tv-strip-cell');
 
-  // Build SLOT-BASED position lookup table
-  const slotPositions=[];
+  // Build IMAGE-BASED position lookup (left edge of every image in one round)
+  const imagePositions=[];
   let pos=0;
   const g=(gap||0);
   for(let i=0;i<perRound;i++){
-    const span=displayCells[i].span||1;
     const w=cells[i]?cells[i].getBoundingClientRect().width:0;
-    for(let s=0;s<span;s++){
-      slotPositions.push(pos+s*(w/span));
-    }
+    imagePositions.push(pos);
     pos+=w+g;
   }
-  const roundW=pos-g; // start-to-start distance between copies
-  const totalSlots=slotPositions.length;
+  const roundW=pos-g; // distance from image 0 to image 0 of next copy
+  if(roundW<=0) return;
 
-  let slotIdx=0;
+  // Step = number of images to advance per tick (never more than perRound)
+  const imageStep=Math.max(1, Math.min(step, perRound));
+
+  let imageIdx=0;
   let absPos=0; // cumulative absolute pixel position (keeps growing forward)
   let snapTimer=null;
   const mod=(a,m)=>((a%m)+m)%m;
@@ -267,16 +261,16 @@ function startStripAnim(stripEl, displayCells, cols, step, delay=0, gap=0){
   const tick=()=>{
     if(snapTimer){ clearTimeout(snapTimer); snapTimer=null; }
 
-    const prevSlotIdx=slotIdx;
-    slotIdx=mod(slotIdx+effectiveStep, totalSlots);
+    const prevImageIdx=imageIdx;
+    imageIdx=mod(imageIdx+imageStep, perRound);
 
     // Calculate calm forward delta (never a big roundW jump)
     let delta;
-    if(slotIdx>=prevSlotIdx){
-      delta=slotPositions[slotIdx]-slotPositions[prevSlotIdx];
+    if(imageIdx>=prevImageIdx){
+      delta=imagePositions[imageIdx]-imagePositions[prevImageIdx];
     }else{
       // Wrapped around end of timeline: to end + from start
-      delta=(roundW-slotPositions[prevSlotIdx])+slotPositions[slotIdx];
+      delta=(roundW-imagePositions[prevImageIdx])+imagePositions[imageIdx];
     }
 
     absPos+=delta;
