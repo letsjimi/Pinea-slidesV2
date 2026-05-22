@@ -236,8 +236,11 @@ function startStripAnim(stripEl, displayCells, cols, step, delay=0, gap=0){
   const perRound=totalCells/3;
   if(!perRound) return;
 
-  // Ruhiger Lauf: nie mehr als die sichtbare Breite auf einmal scrollen
-  const effectiveStep = Math.min(step, cols);
+  // Ruhiger Lauf: nie mehr als die sichtbare Breite auf einmal scrollen.
+  // Korrektur für span>1: step bezieht sich auf ganze Bilder, nicht auf Slots.
+  // Wir multiplizieren mit baseSpan, damit wir immer an Bildgrenzen landen.
+  const baseSpan = (displayCells[0]?.span) || 1;
+  const effectiveStep = Math.max(1, Math.min(step, Math.floor(cols / baseSpan))) * baseSpan;
 
   const cells=stripEl.querySelectorAll('.tv-strip-cell');
 
