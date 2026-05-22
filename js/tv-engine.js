@@ -256,7 +256,7 @@ function startStripAnim(stripEl, displayCells, cols, step, delay=0, gap=0){
     }
     pos+=w+g;
   }
-  const roundW=pos-g; // start-to-start distance between copies
+  const roundW=pos; // start-to-start distance between copies (includes trailing gap)
   const totalSlots=slotPositions.length;
 
   let slotIdx=0;
