@@ -108,6 +108,8 @@ function renderMatrix() {
     }
   }
 
+  const stripTasks=[];
+
   for(let r=0;r<rows;r++){
     const ids=timelines[r]||[];
     const hasImages=ids.length>0;
@@ -152,7 +154,7 @@ function renderMatrix() {
 
       if(hasImages){
         const delay=layout.rowOffsets?.[r] || 0;
-        startStripAnim(strip, displayCells, cols, step, delay, rowGap);
+        stripTasks.push(() => startStripAnim(strip, displayCells, cols, step, delay, rowGap));
       }
     }else{
       for(let c=0;c<cols;c++){
@@ -184,6 +186,13 @@ function renderMatrix() {
     }
   }
   container.appendChild(matrix);
+
+  // Defer strip animation init until after layout so container widths are real
+  if(stripTasks.length){
+    requestAnimationFrame(() => {
+      stripTasks.forEach(fn => fn());
+    });
+  }
 }
 
 /* CELL ANIMATION */
@@ -219,7 +228,7 @@ function startCellAnim(rowIdx, slideIds, cols, step, delay=0){
   rowTimers.push(initial);
 }
 
-/* STRIP ANIMATION — pixel-perfect infinite loop via position lookup table */
+/* STRIP ANIMATION — pixel-perfect infinite loop via SLOT-BASED position lookup table */
 function startStripAnim(stripEl, displayCells, cols, step, delay=0, gap=0){
   const speed=config.slideshowSpeed||5000;
   const dur=transCfg.duration||1200;
@@ -227,52 +236,46 @@ function startStripAnim(stripEl, displayCells, cols, step, delay=0, gap=0){
   const perRound=totalCells/3;
   if(!perRound) return;
 
-  // 1) Build position lookup table for one round (pixel-exact)
-  const containerW=stripEl.parentElement?.clientWidth||stripEl.clientWidth;
-  const colW=containerW/cols;
-  const roundW=perRound===1
-    ? (colW*(displayCells[0]?.span||1))
-    : displayCells.slice(0,perRound).reduce((sum,cell,i,arr)=>sum+colW*(cell.span||1)+(i<arr.length-1?(gap||0):0),0);
+  const cells=stripEl.querySelectorAll('.tv-strip-cell');
 
-  // Pre-calculate each cell's exact starting position within one round
-  const positions=[0]; // positions[0]=0
+  // Build SLOT-BASED position lookup table.
+  // Each span unit = 1 slot. A span=2 image occupies 2 consecutive slots,
+  // so step=2 scrolls exactly past it without skipping a neighbour.
+  const slotPositions=[];
+  let pos=0;
+  const g=(gap||0);
   for(let i=0;i<perRound;i++){
-    const w=colW*(displayCells[i]?.span||1);
-    const g=(i<perRound-1)?(gap||0):0;
-    positions.push(positions[positions.length-1]+w+g);
+    const span=displayCells[i].span||1;
+    const w=cells[i]?cells[i].getBoundingClientRect().width:0;
+    for(let s=0;s<span;s++){
+      slotPositions.push(pos+s*(w/span));
+    }
+    pos+=w+g;
   }
-  // positions now has perRound+1 entries: [p0, p1, ... pN=roundW]
+  const roundW=pos-g; // start-to-start distance between copies
+  const totalSlots=slotPositions.length;
 
-  let stepIdx=0; // which position we're at (0..perRound-1)
-
-  // 2) Helper: true modulo for negative/zero
+  let slotIdx=0;
+  let snapTimer=null;
   const mod=(a,m)=>((a%m)+m)%m;
 
   const tick=()=>{
-    // advance stepIdx by `step` positions (mod perRound)
-    // step=1 means move to next cell, step=2 means skip one, etc.
-    stepIdx=mod(stepIdx+step, perRound);
-
-    // We want to be at the 2nd copy (perRound..2*perRound-1) for infinite illusion
-    const virtualPos=positions[stepIdx]+roundW; // 2nd copy
-
-    // Transition smoothly to virtualPos
+    if(snapTimer){ clearTimeout(snapTimer); snapTimer=null; }
+    slotIdx=mod(slotIdx+step, totalSlots);
+    const snapPos=slotPositions[slotIdx];
+    const virtualPos=snapPos+roundW; // 2nd copy
     stripEl.style.transition=`transform ${dur}ms ${transCfg.easing||'ease-in-out'}`;
     stripEl.style.transform=`translateX(${-virtualPos}px)`;
-
-    // After transition completes: instant snap to 1st copy at same visual position
-    // (the 1st copy at positions[stepIdx] looks EXACTLY the same as 2nd copy at virtualPos)
-    setTimeout(()=>{
+    snapTimer=setTimeout(()=>{
+      snapTimer=null;
       stripEl.style.transition='none';
-      stripEl.style.transform=`translateX(${-positions[stepIdx]}px)`;
+      stripEl.style.transform=`translateX(${-snapPos}px)`;
       void stripEl.offsetWidth;
       stripEl.style.transition='';
-    }, dur+10); // +10ms safety buffer
+    }, dur+10);
   };
 
-  // Initial: start at 1st copy, position 0
   stripEl.style.transform='translateX(0px)';
-
   const initial=setTimeout(()=>{
     tick();
     const interval=setInterval(tick, speed);
