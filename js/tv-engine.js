@@ -228,7 +228,7 @@ function startCellAnim(rowIdx, slideIds, cols, step, delay=0){
   rowTimers.push(initial);
 }
 
-/* STRIP ANIMATION — calm infinite loop, scrolls by whole-image delta each tick */
+/* STRIP ANIMATION — calm infinite loop, scrolls by small delta each tick */
 function startStripAnim(stripEl, displayCells, cols, step, delay=0, gap=0){
   const speed=config.slideshowSpeed||5000;
   const dur=transCfg.duration||1200;
@@ -236,37 +236,27 @@ function startStripAnim(stripEl, displayCells, cols, step, delay=0, gap=0){
   const perRound=totalCells/3;
   if(!perRound) return;
 
+  // Ruhiger Lauf: nie mehr als die sichtbare Breite auf einmal scrollen
+  const effectiveStep = Math.min(step, cols);
+
   const cells=stripEl.querySelectorAll('.tv-strip-cell');
 
-  // Mutable state so we can remeasure on resize
-  const state={cells, gap:(gap||0), perRound, imagePositions:[], roundW:0};
-
-  function measure(){
-    let pos=0;
-    const arr=[];
-    for(let i=0;i<state.perRound;i++){
-      const w=state.cells[i]?state.cells[i].getBoundingClientRect().width:0;
-      arr.push(pos);
-      pos+=w+state.gap;
+  // Build SLOT-BASED position lookup table
+  const slotPositions=[];
+  let pos=0;
+  const g=(gap||0);
+  for(let i=0;i<perRound;i++){
+    const span=displayCells[i].span||1;
+    const w=cells[i]?cells[i].getBoundingClientRect().width:0;
+    for(let s=0;s<span;s++){
+      slotPositions.push(pos+s*(w/span));
     }
-    state.imagePositions=arr;
-    state.roundW=pos; // distance from image 0 to image 0 of next copy (includes trailing gap)
+    pos+=w+g;
   }
-  measure();
-  if(state.roundW<=0) return;
+  const roundW=pos; // start-to-start distance between copies (INCLUDES trailing gap)
+  const totalSlots=slotPositions.length;
 
-  // ResizeObserver: remeasure when row size changes so deltas stay pixel-perfect
-  if(typeof ResizeObserver!=='undefined'){
-    const ro=new ResizeObserver(()=>{
-      measure();
-    });
-    if(stripEl.parentElement) ro.observe(stripEl.parentElement);
-  }
-
-  // Step = number of images to advance per tick (never more than perRound)
-  const imageStep=Math.max(1, Math.min(step, perRound));
-
-  let imageIdx=0;
+  let slotIdx=0;
   let absPos=0; // cumulative absolute pixel position (keeps growing forward)
   let snapTimer=null;
   const mod=(a,m)=>((a%m)+m)%m;
@@ -274,16 +264,16 @@ function startStripAnim(stripEl, displayCells, cols, step, delay=0, gap=0){
   const tick=()=>{
     if(snapTimer){ clearTimeout(snapTimer); snapTimer=null; }
 
-    const prevImageIdx=imageIdx;
-    imageIdx=mod(imageIdx+imageStep, perRound);
+    const prevSlotIdx=slotIdx;
+    slotIdx=mod(slotIdx+effectiveStep, totalSlots);
 
     // Calculate calm forward delta (never a big roundW jump)
     let delta;
-    if(imageIdx>=prevImageIdx){
-      delta=state.imagePositions[imageIdx]-state.imagePositions[prevImageIdx];
+    if(slotIdx>=prevSlotIdx){
+      delta=slotPositions[slotIdx]-slotPositions[prevSlotIdx];
     }else{
       // Wrapped around end of timeline: to end + from start
-      delta=(state.roundW-state.imagePositions[prevImageIdx])+state.imagePositions[imageIdx];
+      delta=(roundW-slotPositions[prevSlotIdx])+slotPositions[slotIdx];
     }
 
     absPos+=delta;
@@ -295,8 +285,8 @@ function startStripAnim(stripEl, displayCells, cols, step, delay=0, gap=0){
     // After transition: if we've entered the 3rd copy, snap back by roundW
     snapTimer=setTimeout(()=>{
       snapTimer=null;
-      if(absPos>=state.roundW*2){
-        absPos-=state.roundW;
+      if(absPos>=roundW*2){
+        absPos-=roundW;
         stripEl.style.transition='none';
         stripEl.style.transform=`translateX(${-absPos}px)`;
         void stripEl.offsetWidth;
