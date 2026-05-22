@@ -236,11 +236,15 @@ function startStripAnim(stripEl, displayCells, cols, step, delay=0, gap=0){
   const perRound=totalCells/3;
   if(!perRound) return;
 
+  // Ruhiger Lauf: scroll immer exakt um die sichtbare Breite (cols Slots),
+  // nie mehrere Seiten auf einmal. Das verhindert "Rasen" durch lange Timelines.
+  const effectiveStep = Math.min(step, cols);
+
   const cells=stripEl.querySelectorAll('.tv-strip-cell');
 
   // Build SLOT-BASED position lookup table.
   // Each span unit = 1 slot. A span=2 image occupies 2 consecutive slots,
-  // so step=2 scrolls exactly past it without skipping a neighbour.
+  // so effectiveStep scrolls exactly one visible page without skipping neighbours.
   const slotPositions=[];
   let pos=0;
   const g=(gap||0);
@@ -261,7 +265,7 @@ function startStripAnim(stripEl, displayCells, cols, step, delay=0, gap=0){
 
   const tick=()=>{
     if(snapTimer){ clearTimeout(snapTimer); snapTimer=null; }
-    slotIdx=mod(slotIdx+step, totalSlots);
+    slotIdx=mod(slotIdx+effectiveStep, totalSlots);
     const snapPos=slotPositions[slotIdx];
     const virtualPos=snapPos+roundW; // 2nd copy
     stripEl.style.transition=`transform ${dur}ms ${transCfg.easing||'ease-in-out'}`;
