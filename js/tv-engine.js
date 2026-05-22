@@ -247,7 +247,7 @@ function startStripAnim(stripEl, displayCells, cols, step, delay=0, gap=0){
     imagePositions.push(pos);
     pos+=w+g;
   }
-  const roundW=pos-g; // distance from image 0 to image 0 of next copy
+  const roundW=pos; // distance from image 0 to image 0 of next copy (includes trailing gap)
   if(roundW<=0) return;
 
   // Step = number of images to advance per tick (never more than perRound)
