@@ -47,6 +47,24 @@ function table(name){
         if(name==='slides') return api.deleteSlide(id).then(()=>id);
         return Promise.resolve(id);
     };
+    t.where = (field) => {
+        const chain = {
+            _vals: [],
+            anyOf: (...vals) => { chain._vals = vals; return chain; },
+            equals: (val) => { chain._vals = [val]; return chain; },
+            sortBy: async (sortField) => {
+                const arr = await t.toArray();
+                const vals = chain._vals || [];
+                const key = field === 'tvAssignment' ? 'tvAssignment' : field;
+                const filtered = arr.filter(x => vals.some(v => x[key] === v || String(x[key]) === String(v)));
+                return filtered.sort((a,b) => (a.sortOrder||0) - (b.sortOrder||0));
+            }
+        };
+        return {
+            anyOf: (...vals) => chain.anyOf(...vals),
+            equals: (val) => chain.equals(val),
+        };
+    };
     return t;
 }
 
@@ -66,7 +84,7 @@ export const DEFAULT_CONFIG = {
     gridWidthPx:1, gridCols:2, gridRows:2, cropMode:'cover', transitionType:'fade',
     transitionSettings:{duration:1200,easing:'ease-in-out'}, showGroupLabel:true,
     groupLabelPos:'bottom', labelColor:'#ffffff', labelBgOpacity:0.6,
-    debugOverlay:false, autoStart:true, idleTimeout:0, slideshowSpeed:5000
+    debugOverlay:false, autoStart:true, idleTimeout:0, slideshowSpeed:5000, refreshInterval:'2m'
 };
 
 export async function initGroupsIfEmpty(){

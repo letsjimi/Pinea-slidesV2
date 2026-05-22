@@ -1,0 +1,190 @@
+// PINEA Slides V4.1 — Dual-Port Server (Admin:8090, TV:8091)
+const express = require('express');
+const path = require('path');
+const fs = require('fs');
+const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const multer = require('multer');
+const cors = require('cors');
+
+const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(32).toString('hex');
+const DATA_DIR = path.join(__dirname, 'data');
+const IMG_DIR = path.join(DATA_DIR, 'images');
+
+/* ===== DATA HELPERS ===== */
+function ensureDir(dir){ if(!fs.existsSync(dir)) fs.mkdirSync(dir, {recursive:true}); }
+ensureDir(DATA_DIR); ensureDir(IMG_DIR);
+function loadJSON(file, def=null){ try{ return JSON.parse(fs.readFileSync(file, 'utf8')); }catch(e){ return def; } }
+function saveJSON(file, data){ fs.writeFileSync(file, JSON.stringify(data, null, 2)); }
+const CONFIG_FILE = path.join(DATA_DIR, 'config.json');
+const LAYOUTS_FILE = path.join(DATA_DIR, 'layouts.json');
+const SLIDES_FILE = path.join(DATA_DIR, 'slides.json');
+const GROUPS_FILE = path.join(DATA_DIR, 'groups.json');
+const AUTH_FILE = path.join(DATA_DIR, 'auth.json');
+
+function initData(){
+  if(!fs.existsSync(CONFIG_FILE)) saveJSON(CONFIG_FILE, {
+    id:'global', gridColor:'#ff3366', gridVisible:false, gridOpacity:0.4,
+    gridWidthPx:1, gridCols:2, gridRows:2, cropMode:'cover', transitionType:'fade',
+    transitionSettings:{duration:1200,easing:'ease-in-out'}, showGroupLabel:true,
+    groupLabelPos:'bottom', labelColor:'#ffffff', labelBgOpacity:0.6,
+    debugOverlay:false, autoStart:true, idleTimeout:0, slideshowSpeed:5000
+  });
+  if(!fs.existsSync(LAYOUTS_FILE)) saveJSON(LAYOUTS_FILE, {
+    left:{tvId:'left',rows:3,cols:2,timelines:[[],[],[]],rowAnimationModes:['cell','cell','cell'],rowSteps:[1,1,1],stripSteps:[1,1,1],rowCellGaps:[4,4,4],rowOffsets:[0,2000,4000]},
+    right:{tvId:'right',rows:3,cols:2,timelines:[[],[],[]],rowAnimationModes:['cell','cell','cell'],rowSteps:[1,1,1],stripSteps:[1,1,1],rowCellGaps:[4,4,4],rowOffsets:[0,2000,4000]}
+  });
+  if(!fs.existsSync(SLIDES_FILE)) saveJSON(SLIDES_FILE, []);
+  if(!fs.existsSync(GROUPS_FILE)) saveJSON(GROUPS_FILE, [
+    {id:1,name:'Allgemein',color:'#00aaff',sortOrder:0},
+    {id:2,name:'Programm',color:'#ffaa00',sortOrder:1},
+    {id:3,name:'Specials',color:'#00ff88',sortOrder:2}
+  ]);
+  if(!fs.existsSync(AUTH_FILE)){
+    saveJSON(AUTH_FILE, {users:[{username:'HannaM', password:bcrypt.hashSync('PineaSlides_V4.1!',10)}]});
+  }
+}
+initData();
+
+/* ===== MULTER ===== */
+const storage = multer.diskStorage({
+  destination:(req,file,cb)=>cb(null,IMG_DIR),
+  filename:(req,file,cb)=>{
+    const ext = path.extname(file.originalname)||'.jpg';
+    cb(null, file.fieldname+'-'+Date.now()+'-'+Math.round(Math.random()*1e9)+ext);
+  }
+});
+const upload = multer({storage, limits:{fileSize:20*1024*1024, files:50}});
+
+/* ===== AUTH MIDDLEWARE ===== */
+function authMW(req,res,next){
+  const auth = req.headers.authorization;
+  if(!auth||!auth.startsWith('Bearer ')) return res.status(401).json({error:'Unauthorized'});
+  try{ req.user = jwt.verify(auth.slice(7), JWT_SECRET); next(); }
+  catch(e){ return res.status(401).json({error:'Invalid token'}); }
+}
+
+/* ===== PUBLIC API ROUTES ===== */
+function setupPublicAPI(app){
+  app.get('/api/config', (req,res)=>res.json(loadJSON(CONFIG_FILE)));
+  app.get('/api/layouts', (req,res)=>res.json(loadJSON(LAYOUTS_FILE)));
+  app.get('/api/layouts/:tvId', (req,res)=>{
+    const all=loadJSON(LAYOUTS_FILE); const l=all[req.params.tvId];
+    if(!l) return res.status(404).json({error:'Not found'});
+    res.json(l);
+  });
+  app.get('/api/slides', (req,res)=>res.json(loadJSON(SLIDES_FILE,[])));
+  app.get('/api/groups', (req,res)=>res.json(loadJSON(GROUPS_FILE,[])));
+  app.get('/api/images/:name', (req,res)=>{
+    const p=path.join(IMG_DIR, path.basename(req.params.name));
+    if(!fs.existsSync(p)) return res.status(404).json({error:'Image not found'});
+    res.sendFile(p);
+  });
+}
+
+/* ===== ADMIN API ROUTES ===== */
+function setupAdminAPI(app){
+  app.post('/api/auth/login', (req,res)=>{
+    const {username, password}=req.body||{};
+    if(!username||!password) return res.status(400).json({error:'Missing credentials'});
+    const auth=loadJSON(AUTH_FILE,{users:[]});
+    const user=auth.users.find(u=>u.username===username);
+    if(!user||!bcrypt.compareSync(password,user.password)) return res.status(401).json({error:'Invalid credentials'});
+    const token=jwt.sign({username}, JWT_SECRET, {expiresIn:'7d'});
+    res.json({token, username});
+  });
+  app.post('/api/auth/change-password', authMW, (req,res)=>{
+    const {oldPassword,newPassword}=req.body||{};
+    const auth=loadJSON(AUTH_FILE,{users:[]});
+    const user=auth.users.find(u=>u.username===req.user.username);
+    if(!user||!bcrypt.compareSync(oldPassword,user.password)) return res.status(403).json({error:'Wrong password'});
+    user.password=bcrypt.hashSync(newPassword,10); saveJSON(AUTH_FILE,auth);
+    res.json({ok:true});
+  });
+  app.put('/api/config', authMW, (req,res)=>{
+    const merged={...loadJSON(CONFIG_FILE),...req.body,id:'global'}; saveJSON(CONFIG_FILE,merged); res.json(merged);
+  });
+  app.put('/api/layouts/:tvId', authMW, (req,res)=>{
+    const all=loadJSON(LAYOUTS_FILE); all[req.params.tvId]={...req.body,tvId:req.params.tvId}; saveJSON(LAYOUTS_FILE,all); res.json(all[req.params.tvId]);
+  });
+  app.post('/api/slides', authMW, (req,res)=>{
+    const slides=loadJSON(SLIDES_FILE,[]); const s=req.body; if(!s.id) s.id=Date.now()+Math.floor(Math.random()*1000); slides.push(s); saveJSON(SLIDES_FILE,slides); res.json(s);
+  });
+  app.put('/api/slides/:id', authMW, (req,res)=>{
+    let slides=loadJSON(SLIDES_FILE,[]); const idx=slides.findIndex(x=>x.id==req.params.id); if(idx<0) return res.status(404).json({error:'Not found'});
+    slides[idx]={...slides[idx],...req.body,id:Number(req.params.id)}; saveJSON(SLIDES_FILE,slides); res.json(slides[idx]);
+  });
+  app.delete('/api/slides/:id', authMW, (req,res)=>{
+    let slides=loadJSON(SLIDES_FILE,[]); const slide=slides.find(x=>x.id==req.params.id);
+    slides=slides.filter(x=>x.id!=req.params.id); saveJSON(SLIDES_FILE,slides);
+    if(slide?.imageFilename){ try{fs.unlinkSync(path.join(IMG_DIR,slide.imageFilename));}catch(e){} }
+    res.json({ok:true});
+  });
+  app.post('/api/slides/bulk', authMW, (req,res)=>{
+    const slides=loadJSON(SLIDES_FILE,[]); const incoming=req.body.slides||[]; incoming.forEach(s=>{if(!s.id) s.id=Date.now()+Math.floor(Math.random()*1000); slides.push(s);}); saveJSON(SLIDES_FILE,slides); res.json({ok:true,count:incoming.length});
+  });
+  app.post('/api/groups', authMW, (req,res)=>{
+    const groups=loadJSON(GROUPS_FILE,[]); const g=req.body; if(!g.id) g.id=Date.now()+Math.floor(Math.random()*1000); groups.push(g); saveJSON(GROUPS_FILE,groups); res.json(g);
+  });
+  app.put('/api/groups/:id', authMW, (req,res)=>{
+    let groups=loadJSON(GROUPS_FILE,[]); const idx=groups.findIndex(x=>x.id==req.params.id); if(idx<0) return res.status(404).json({error:'Not found'});
+    groups[idx]={...groups[idx],...req.body,id:Number(req.params.id)}; saveJSON(GROUPS_FILE,groups); res.json(groups[idx]);
+  });
+  app.delete('/api/groups/:id', authMW, (req,res)=>{
+    let groups=loadJSON(GROUPS_FILE,[]); groups=groups.filter(x=>x.id!=req.params.id); saveJSON(GROUPS_FILE,groups); res.json({ok:true});
+  });
+  app.post('/api/upload', authMW, upload.array('images',50), (req,res)=>{
+    const files=(req.files||[]).map(f=>({filename:f.filename, originalName:f.originalname, url:'/api/images/'+f.filename}));
+    res.json({files});
+  });
+}
+
+/* ===== ERROR HANDLER ===== */
+function setupErrorHandler(app){
+  app.use((err,req,res,next)=>{ console.error(err); res.status(err.status||500).json({error:err.message||'Internal error'}); });
+}
+
+/* ===== BUILD ADMIN APP (8090) ===== */
+const adminApp = express();
+adminApp.use(cors()); adminApp.use(express.json({limit:'50mb'})); adminApp.use(express.urlencoded({extended:true,limit:'50mb'}));
+setupPublicAPI(adminApp); setupAdminAPI(adminApp);
+adminApp.use('/images', express.static(IMG_DIR));
+adminApp.use(express.static(path.join(__dirname)));
+adminApp.get('/admin', (req,res)=>res.sendFile(path.join(__dirname,'index.html')));
+setupErrorHandler(adminApp);
+
+const adminServer = adminApp.listen(8090, '0.0.0.0', ()=>{
+  console.log(`\n🎬 PINEA Admin — http://0.0.0.0:8090/admin`);
+});
+
+/* ===== BUILD TV APP (8091) ===== */
+const tvApp = express();
+tvApp.use(cors()); tvApp.use(express.json({limit:'50mb'}));
+setupPublicAPI(tvApp);
+tvApp.use('/images', express.static(IMG_DIR));
+tvApp.use(express.static(path.join(__dirname)));
+
+/* Hostname-based routing */
+tvApp.use((req,res,next)=>{
+  const h = req.hostname || '';
+  if(h.startsWith('tvleft.')){
+    return res.sendFile(path.join(__dirname,'tv-left.html'));
+  }
+  if(h.startsWith('tvright.')){
+    return res.sendFile(path.join(__dirname,'tv-right.html'));
+  }
+  next();
+});
+
+tvApp.get('/tv-left', (req,res)=>res.sendFile(path.join(__dirname,'tv-left.html')));
+tvApp.get('/tv-right', (req,res)=>res.sendFile(path.join(__dirname,'tv-right.html')));
+setupErrorHandler(tvApp);
+
+const tvServer = tvApp.listen(8091, '0.0.0.0', ()=>{
+  console.log(`🎬 PINEA TV      — http://0.0.0.0:8091/tv-left`);
+  console.log(`                  — http://0.0.0.0:8091/tv-right\n`);
+});
+
+process.on('SIGTERM', ()=>{ adminServer.close(()=>tvServer.close(()=>process.exit(0))); });
+process.on('SIGINT',  ()=>{ adminServer.close(()=>tvServer.close(()=>process.exit(0))); });

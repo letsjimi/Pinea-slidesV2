@@ -3,11 +3,11 @@
   "gridColor": "#ff3366",
   "gridVisible": false,
   "gridOpacity": 0.4,
-  "gridWidthPx": 1,
-  "gridCols": 2,
-  "gridRows": 2,
+  "gridWidthPx": null,
+  "gridCols": null,
+  "gridRows": null,
   "cropMode": "cover",
-  "transitionType": "fade",
+  "transitionType": "slide",
   "transitionSettings": {
     "duration": 1200,
     "easing": "ease-in-out"
@@ -16,8 +16,10 @@
   "groupLabelPos": "bottom",
   "labelColor": "#ffffff",
   "labelBgOpacity": 0.6,
-  "debugOverlay": false,
+  "debugOverlay": true,
   "autoStart": true,
   "idleTimeout": 0,
-  "slideshowSpeed": 5000
+  "slideshowSpeed": 5000,
+  "refreshInterval": "1m",
+  "lastModified": 1779475754663
 }

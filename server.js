@@ -1,4 +1,4 @@
-// PINEA Slides V4.1 — Drei-Port Server (Admin:8090, TV-Left:8091, TV-Right:8092)
+// PINEA Slides V4.2 — Drei-Port Server (Admin:8095, TV-Left:8096, TV-Right:8097)
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
@@ -7,8 +7,20 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const cors = require('cors');
+const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
 
-const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(32).toString('hex');
+/* ===== PERSISTED JWT SECRET ===== */
+const SECRET_FILE = path.join(__dirname, '.jwt_secret');
+let JWT_SECRET;
+if(fs.existsSync(SECRET_FILE)){
+  JWT_SECRET = fs.readFileSync(SECRET_FILE, 'utf8').trim();
+} else {
+  JWT_SECRET = crypto.randomBytes(32).toString('hex');
+  fs.writeFileSync(SECRET_FILE, JWT_SECRET, {mode:0o600});
+  console.log('Generated new JWT_SECRET (persisted to .jwt_secret)');
+}
+
 const DATA_DIR = path.join(__dirname, 'data');
 const IMG_DIR = path.join(DATA_DIR, 'images');
 const ROOT_DIR = __dirname;
@@ -30,11 +42,15 @@ function initData(){
     gridWidthPx:1, gridCols:2, gridRows:2, cropMode:'cover', transitionType:'fade',
     transitionSettings:{duration:1200,easing:'ease-in-out'}, showGroupLabel:true,
     groupLabelPos:'bottom', labelColor:'#ffffff', labelBgOpacity:0.6,
-    debugOverlay:false, autoStart:true, idleTimeout:0, slideshowSpeed:5000
+    debugOverlay:false, autoStart:true, idleTimeout:0, slideshowSpeed:5000, refreshInterval:'2m', lastModified:Date.now()
   });
+  else {
+    const cfg=loadJSON(CONFIG_FILE);
+    if(cfg.lastModified===undefined){ cfg.lastModified=Date.now(); saveJSON(CONFIG_FILE,cfg); }
+  }
   if(!fs.existsSync(LAYOUTS_FILE)) saveJSON(LAYOUTS_FILE, {
-    left:{tvId:'left',rows:3,cols:2,timelines:[[],[],[]],rowAnimationModes:['cell','cell','cell'],rowSteps:[1,1,1],stripSteps:[1,1,1],rowCellGaps:[4,4,4],rowOffsets:[0,2000,4000]},
-    right:{tvId:'right',rows:3,cols:2,timelines:[[],[],[]],rowAnimationModes:['cell','cell','cell'],rowSteps:[1,1,1],stripSteps:[1,1,1],rowCellGaps:[4,4,4],rowOffsets:[0,2000,4000]}
+    left:{tvId:'left',rows:3,cols:2,timelines:[[],[],[]],rowLabels:['','',''],rowAnimationModes:['cell','cell','cell'],rowSteps:[1,1,1],stripSteps:[1,1,1],rowCellGaps:[4,4,4],rowOffsets:[0,2000,4000]},
+    right:{tvId:'right',rows:3,cols:2,timelines:[[],[],[]],rowLabels:['','',''],rowAnimationModes:['cell','cell','cell'],rowSteps:[1,1,1],stripSteps:[1,1,1],rowCellGaps:[4,4,4],rowOffsets:[0,2000,4000]}
   });
   if(!fs.existsSync(SLIDES_FILE)) saveJSON(SLIDES_FILE, []);
   if(!fs.existsSync(GROUPS_FILE)) saveJSON(GROUPS_FILE, [
@@ -48,7 +64,19 @@ function initData(){
 }
 initData();
 
-/* ===== MULTER ===== */
+/* ===== MULTER (with MIME filter) ===== */
+const ALLOWED_MIME = ['image/jpeg','image/png','image/webp','image/gif','image/bmp','image/svg+xml'];
+const ALLOWED_EXTS = ['.jpg','.jpeg','.png','.webp','.gif','.bmp','.svg'];
+
+const fileFilter = (req,file,cb)=>{
+  const ext = path.extname(file.originalname||'').toLowerCase();
+  if(ALLOWED_MIME.includes(file.mimetype) && ALLOWED_EXTS.includes(ext)){
+    cb(null,true);
+  } else {
+    cb(new Error('Invalid file type. Allowed: '+ALLOWED_EXTS.join(', ')),false);
+  }
+};
+
 const storage = multer.diskStorage({
   destination:(req,file,cb)=>cb(null,IMG_DIR),
   filename:(req,file,cb)=>{
@@ -56,7 +84,7 @@ const storage = multer.diskStorage({
     cb(null, file.fieldname+'-'+Date.now()+'-'+Math.round(Math.random()*1e9)+ext);
   }
 });
-const upload = multer({storage, limits:{fileSize:20*1024*1024, files:50}});
+const upload = multer({storage, limits:{fileSize:20*1024*1024, files:50}, fileFilter});
 
 /* ===== AUTH MIDDLEWARE ===== */
 function authMW(req,res,next){
@@ -65,6 +93,24 @@ function authMW(req,res,next){
   try{ req.user = jwt.verify(auth.slice(7), JWT_SECRET); next(); }
   catch(e){ return res.status(401).json({error:'Invalid token'}); }
 }
+
+/* ===== RATE LIMITERS ===== */
+const loginLimiter = rateLimit({
+  windowMs: 15*60*1000, // 15 Minuten
+  max: 10,               // 10 Versuche pro IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true,  // nur fehlgeschlagene zählen
+  handler:(req,res)=>res.status(429).json({error:'Too many login attempts. Try again in 15 minutes.'})
+});
+const apiLimiter = rateLimit({
+  windowMs: 60*1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip:(req)=>req.path==='/',
+  handler:(req,res)=>res.status(429).json({error:'Too many requests. Slow down.'})
+});
 
 /* ===== PUBLIC API ROUTES ===== */
 function setupPublicAPI(app){
@@ -76,6 +122,17 @@ function setupPublicAPI(app){
     res.json(l);
   });
   app.get('/api/slides', (req,res)=>res.json(loadJSON(SLIDES_FILE,[])));
+  app.get('/api/slides/:id', (req,res)=>{
+    const slides=loadJSON(SLIDES_FILE,[]);
+    const s=slides.find(x=>x.id==req.params.id);
+    if(!s) return res.status(404).json({error:'Not found'});
+    res.json({slide:s});
+  });
+  app.get('/api/check-update', (req,res)=>{
+    const cfg=loadJSON(CONFIG_FILE);
+    const since=parseInt(req.query.since)||0;
+    res.json({changed: (cfg.lastModified||0) > since, lastModified: cfg.lastModified||0});
+  });
   app.get('/api/groups', (req,res)=>res.json(loadJSON(GROUPS_FILE,[])));
   app.get('/api/images/:name', (req,res)=>{
     const p=path.join(IMG_DIR, path.basename(req.params.name));
@@ -86,7 +143,7 @@ function setupPublicAPI(app){
 
 /* ===== ADMIN API ROUTES ===== */
 function setupAdminAPI(app){
-  app.post('/api/auth/login', (req,res)=>{
+  app.post('/api/auth/login', loginLimiter, (req,res)=>{
     const {username, password}=req.body||{};
     if(!username||!password) return res.status(400).json({error:'Missing credentials'});
     const auth=loadJSON(AUTH_FILE,{users:[]});
@@ -100,104 +157,125 @@ function setupAdminAPI(app){
     const auth=loadJSON(AUTH_FILE,{users:[]});
     const user=auth.users.find(u=>u.username===req.user.username);
     if(!user||!bcrypt.compareSync(oldPassword,user.password)) return res.status(403).json({error:'Wrong password'});
+    if(!newPassword||newPassword.length<6) return res.status(400).json({error:'Password must be at least 6 characters'});
     user.password=bcrypt.hashSync(newPassword,10); saveJSON(AUTH_FILE,auth);
     res.json({ok:true});
   });
   app.put('/api/config', authMW, (req,res)=>{
     const merged={...loadJSON(CONFIG_FILE),...req.body,id:'global'}; saveJSON(CONFIG_FILE,merged); res.json(merged);
+    bumpLastModified();
   });
   app.put('/api/layouts/:tvId', authMW, (req,res)=>{
     const all=loadJSON(LAYOUTS_FILE); all[req.params.tvId]={...req.body,tvId:req.params.tvId}; saveJSON(LAYOUTS_FILE,all); res.json(all[req.params.tvId]);
+    bumpLastModified();
   });
   app.post('/api/slides', authMW, (req,res)=>{
     const slides=loadJSON(SLIDES_FILE,[]); const s=req.body; if(!s.id) s.id=Date.now()+Math.floor(Math.random()*1000); slides.push(s); saveJSON(SLIDES_FILE,slides); res.json(s);
+    bumpLastModified();
   });
   app.put('/api/slides/:id', authMW, (req,res)=>{
     let slides=loadJSON(SLIDES_FILE,[]); const idx=slides.findIndex(x=>x.id==req.params.id); if(idx<0) return res.status(404).json({error:'Not found'});
     slides[idx]={...slides[idx],...req.body,id:Number(req.params.id)}; saveJSON(SLIDES_FILE,slides); res.json(slides[idx]);
+    bumpLastModified();
   });
   app.delete('/api/slides/:id', authMW, (req,res)=>{
     let slides=loadJSON(SLIDES_FILE,[]); const slide=slides.find(x=>x.id==req.params.id);
     slides=slides.filter(x=>x.id!=req.params.id); saveJSON(SLIDES_FILE,slides);
     if(slide?.imageFilename){ try{fs.unlinkSync(path.join(IMG_DIR,slide.imageFilename));}catch(e){} }
     res.json({ok:true});
+    bumpLastModified();
   });
   app.post('/api/slides/bulk', authMW, (req,res)=>{
     const slides=loadJSON(SLIDES_FILE,[]); const incoming=req.body.slides||[]; incoming.forEach(s=>{if(!s.id) s.id=Date.now()+Math.floor(Math.random()*1000); slides.push(s);}); saveJSON(SLIDES_FILE,slides); res.json({ok:true,count:incoming.length});
+    bumpLastModified();
   });
   app.post('/api/groups', authMW, (req,res)=>{
     const groups=loadJSON(GROUPS_FILE,[]); const g=req.body; if(!g.id) g.id=Date.now()+Math.floor(Math.random()*1000); groups.push(g); saveJSON(GROUPS_FILE,groups); res.json(g);
+    bumpLastModified();
   });
   app.put('/api/groups/:id', authMW, (req,res)=>{
     let groups=loadJSON(GROUPS_FILE,[]); const idx=groups.findIndex(x=>x.id==req.params.id); if(idx<0) return res.status(404).json({error:'Not found'});
     groups[idx]={...groups[idx],...req.body,id:Number(req.params.id)}; saveJSON(GROUPS_FILE,groups); res.json(groups[idx]);
+    bumpLastModified();
   });
   app.delete('/api/groups/:id', authMW, (req,res)=>{
     let groups=loadJSON(GROUPS_FILE,[]); groups=groups.filter(x=>x.id!=req.params.id); saveJSON(GROUPS_FILE,groups); res.json({ok:true});
+    bumpLastModified();
   });
   app.post('/api/upload', authMW, upload.array('images',50), (req,res)=>{
     const files=(req.files||[]).map(f=>({filename:f.filename, originalName:f.originalname, url:'/api/images/'+f.filename}));
     res.json({files});
+    bumpLastModified();
   });
 }
 
-/* ===== ERROR HANDLER ===== */
+function bumpLastModified(){ const cfg=loadJSON(CONFIG_FILE); cfg.lastModified=Date.now(); saveJSON(CONFIG_FILE,cfg); }
 function setupErrorHandler(app){
-  app.use((err,req,res,next)=>{ console.error(err); res.status(err.status||500).json({error:err.message||'Internal error'}); });
+  app.use((err,req,res,next)=>{
+    if(err instanceof multer.MulterError){
+      if(err.code==='LIMIT_FILE_SIZE') return res.status(413).json({error:'File too large. Max 20MB.'});
+      if(err.code==='LIMIT_FILE_COUNT') return res.status(413).json({error:'Too many files. Max 50.'});
+      return res.status(400).json({error:err.message});
+    }
+    console.error(err);
+    res.status(err.status||500).json({error:err.message||'Internal error'});
+  });
 }
 
-/* ===== STATIC ASSETS HELPER (nur Assets, keine HTML-Roots) ===== */
+/* ===== STATIC ASSETS (nur Assets, keine HTML-Roots) ===== */
 function serveStaticAssets(app){
   ['/css','/js','/img','/lib'].forEach(p=>{
     app.use(p, express.static(path.join(ROOT_DIR, p.slice(1))));
   });
-  // images aus data
   app.use('/images', express.static(IMG_DIR));
-  // Unpkg proxy (optional, nicht benötigt bei eigenem Host)
   app.use('/unpkg', express.static(path.join(ROOT_DIR, 'node_modules')));
 }
 
-/* ===== BUILD ADMIN APP (8090) ===== */
+/* ===== COMMON MIDDLEWARE ===== */
+function commonMW(app){
+  app.use(helmet({contentSecurityPolicy:false}));
+  app.use(express.json({limit:'50mb'}));
+  app.use(express.urlencoded({extended:true,limit:'50mb'}));
+  app.use(cors());
+}
+
+/* ===== DEV: only Admin + TV-Left ===== */
+
 const adminApp = express();
-adminApp.use(cors()); adminApp.use(express.json({limit:'50mb'})); adminApp.use(express.urlencoded({extended:true,limit:'50mb'}));
+commonMW(adminApp);
+adminApp.use('/api/', apiLimiter);
 setupPublicAPI(adminApp); setupAdminAPI(adminApp);
 serveStaticAssets(adminApp);
-// Admin root = index.html mit Login
 adminApp.get('/', (req,res)=>res.sendFile(path.join(ROOT_DIR,'index.html')));
 setupErrorHandler(adminApp);
-const adminServer = adminApp.listen(8090, '0.0.0.0', ()=>{
-  console.log(`\n🖥️  Admin    http://localhost:8090   → index.html (Login)`);
+const adminServer = adminApp.listen(8095, '0.0.0.0', ()=>{
+  console.log(`\n🖥️  DEV-Admin  http://localhost:8095   → index.html`);
 });
 
-/* ===== BUILD TV-LEFT APP (8091) ===== */
+function hardenTV(app){
+  app.use((req,res,next)=>{
+    res.setHeader('X-Frame-Options','DENY');
+    res.setHeader('Content-Security-Policy',"frame-ancestors 'none'");
+    next();
+  });
+}
+
 const tvLeftApp = express();
-tvLeftApp.use(cors()); tvLeftApp.use(express.json({limit:'50mb'}));
+commonMW(tvLeftApp);
+hardenTV(tvLeftApp);
 setupPublicAPI(tvLeftApp);
 serveStaticAssets(tvLeftApp);
-// TV-Left root = tv-left.html (KEIN index.html, KEIN Login)
 tvLeftApp.get('/', (req,res)=>res.sendFile(path.join(ROOT_DIR,'tv-left.html')));
 setupErrorHandler(tvLeftApp);
-const tvLeftServer = tvLeftApp.listen(8091, '0.0.0.0', ()=>{
-  console.log(`📺 TV-Left  http://localhost:8091   → tv-left.html (öffentlich)`);
+const tvLeftServer = tvLeftApp.listen(8096, '0.0.0.0', ()=>{
+  console.log(`📺 DEV-TVLeft http://localhost:8096   → tv-left.html`);
 });
 
-/* ===== BUILD TV-RIGHT APP (8092) ===== */
-const tvRightApp = express();
-tvRightApp.use(cors()); tvRightApp.use(express.json({limit:'50mb'}));
-setupPublicAPI(tvRightApp);
-serveStaticAssets(tvRightApp);
-// TV-Right root = tv-right.html (KEIN index.html, KEIN Login)
-tvRightApp.get('/', (req,res)=>res.sendFile(path.join(ROOT_DIR,'tv-right.html')));
-setupErrorHandler(tvRightApp);
-const tvRightServer = tvRightApp.listen(8092, '0.0.0.0', ()=>{
-  console.log(`📺 TV-Right http://localhost:8092   → tv-right.html (öffentlich)`);
-});
-
-console.log(`\n🎬 PINEA Slides v4.1 läuft auf 3 Ports\n`);
+console.log(`\n🎬 PINEA DEV läuft auf Ports 8095 + 8096\n`);
 
 process.on('SIGTERM', ()=>{ 
-  adminServer.close(()=>tvLeftServer.close(()=>tvRightServer.close(()=>process.exit(0)))); 
+  adminServer.close(()=>tvLeftServer.close(()=>process.exit(0))); 
 });
 process.on('SIGINT',  ()=>{ 
-  adminServer.close(()=>tvLeftServer.close(()=>tvRightServer.close(()=>process.exit(0)))); 
+  adminServer.close(()=>tvLeftServer.close(()=>process.exit(0))); 
 });
