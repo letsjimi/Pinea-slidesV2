@@ -1,4 +1,4 @@
-// PINEA TV Engine v4.1 — Server Backend Ready
+// PINEA TV Engine v6.1 — Server Backend Ready
 import { db, initDB, DEFAULT_CONFIG } from './db.js';
 
 let config={}, transCfg={}, layout=null, tvSide=null;
@@ -18,6 +18,7 @@ export async function initTV(tv) {
   applyConfig(); await render();
   if(config.idleTimeout>0) setupIdle();
   window.addEventListener('keydown', e=>{ if(e.key==='d' && e.ctrlKey){ e.preventDefault(); toggleDebug(); }});
+  startPolling();
 }
 
 function applyConfig() {
@@ -31,12 +32,16 @@ function applyConfig() {
   if(container && layout.rotation){
     const rot=layout.rotation;
     if(rot===90 || rot===-90){
-      const vw=window.innerWidth, vh=window.innerHeight;
-      // Nach 90°-Rotation tauschen sich Breite/Höhe:
-      // Container-Breite (wird zur Viewport-Höhe) = vh
-      // Container-Höhe  (wird zur Viewport-Breite) = vw
-      container.style.cssText=`position:fixed;left:50%;top:50%;width:${vh}px;height:${vw}px;transform:translate(-50%,-50%) rotate(${rot}deg);transform-origin:center center;`;
-      document.body.classList.add('tv-rotated');
+      const inIframe=window.self!==window.top;
+      if(inIframe){
+        // Preview iframe: simpler sizing to avoid vw/vh clipping in small frame
+        container.style.cssText=`width:100%;height:100%;transform:rotate(${rot}deg);transform-origin:center center;`;
+        document.body.classList.add('tv-rotated');
+      }else{
+        const vw=window.innerWidth, vh=window.innerHeight;
+        container.style.cssText=`position:fixed;left:50%;top:50%;width:${vh}px;height:${vw}px;transform:translate(-50%,-50%) rotate(${rot}deg);transform-origin:center center;`;
+        document.body.classList.add('tv-rotated');
+      }
     }else{
       container.style.cssText='';
       document.body.classList.remove('tv-rotated');
@@ -59,6 +64,7 @@ function applyConfig() {
 async function render() {
   clearTimers();
   removeMatrix();
+  deactivateSlideLayers();
   const totalSlides=(layout.timelines||[]).flat().filter(Boolean).length;
   if(totalSlides===0){
     showScreensaver(true);
@@ -78,6 +84,12 @@ function showScreensaver(show){
   if(ss) ss.classList.toggle('active', show);
   const label=document.getElementById('groupLabel');
   if(label && show) label.classList.remove('visible');
+}
+
+function deactivateSlideLayers(){
+  const a=document.getElementById('slideA'), b=document.getElementById('slideB');
+  if(a){ a.classList.remove('active'); a.style.opacity=''; a.style.transform=''; a.style.backgroundImage=''; }
+  if(b){ b.classList.remove('active'); b.style.opacity=''; b.style.transform=''; b.style.backgroundImage=''; }
 }
 
 /* MATRIX */
@@ -103,6 +115,8 @@ function renderMatrix() {
     }
   }
 
+  const stripTasks=[];
+
   for(let r=0;r<rows;r++){
     const ids=timelines[r]||[];
     const hasImages=ids.length>0;
@@ -116,24 +130,29 @@ function renderMatrix() {
       rowWrapper.className='tv-row';
       rowWrapper.style.cssText=`flex:1;overflow:hidden;position:relative;background:#000;margin-bottom:${(r<rows-1)?rowGap+'px':'0'};`;
 
+      const spans=(layout.timelineSpans?.[r])||[];
+      // Build flat displayCells — triple the timeline for seamless looping
+      const displayCells=[];
+      for(let round=0; round<3; round++){
+        for(let i=0; i<ids.length; i++){
+          displayCells.push({slideId:ids[i], span:spans[i]||1});
+        }
+      }
+
       const strip=document.createElement('div');
       strip.className='tv-strip';
       strip.dataset.row=r;
-      strip.style.cssText=`display:flex;height:100%;`;
-      const displayIds=[...ids,...ids,...ids];
+      strip.style.cssText=`display:flex;height:100%;gap:${rowGap}px;`;
 
-      for(let i=0;i<displayIds.length;i++){
-        const slideId=displayIds[i];
+      for(const info of displayCells){
+        const wPct=(Math.min(info.span,cols)/cols)*100;
         const cell=document.createElement('div');
         cell.className='tv-strip-cell';
-        // Balken als padding-right — Hintergrund des rowWrapper ist schwarz, also sichtbar
-        const isLastInBlock=(i+1)%cols===0;
-        const padRight=isLastInBlock?0:rowGap;
-        cell.style.cssText=`width:calc(100%/${cols});height:100%;flex-shrink:0;position:relative;overflow:hidden;padding-right:${padRight}px;box-sizing:border-box;`;
+        cell.style.cssText=`flex:0 0 ${wPct}%;height:100%;position:relative;overflow:hidden;box-sizing:border-box;`;
         const img=document.createElement('img');
         img.alt=''; img.loading='eager';
         img.style.cssText='width:100%;height:100%;object-fit:var(--crop-mode,cover);display:block;';
-        loadSlideImage(slideId).then(url=>{ if(url){ img.src=url; } }).catch(()=>{});
+        loadSlideImage(info.slideId).then(url=>{ if(url){ img.src=url; } }).catch(()=>{});
         cell.appendChild(img); strip.appendChild(cell);
       }
 
@@ -142,7 +161,7 @@ function renderMatrix() {
 
       if(hasImages){
         const delay=layout.rowOffsets?.[r] || 0;
-        startStripAnim(strip, ids, cols, step, delay, rowGap);
+        stripTasks.push(() => startStripAnim(strip, displayCells, cols, step, delay, rowGap));
       }
     }else{
       for(let c=0;c<cols;c++){
@@ -174,6 +193,13 @@ function renderMatrix() {
     }
   }
   container.appendChild(matrix);
+
+  // Defer strip animation init until after layout so container widths are real
+  if(stripTasks.length){
+    requestAnimationFrame(() => {
+      stripTasks.forEach(fn => fn());
+    });
+  }
 }
 
 /* CELL ANIMATION */
@@ -209,38 +235,74 @@ function startCellAnim(rowIdx, slideIds, cols, step, delay=0){
   rowTimers.push(initial);
 }
 
-/* STRIP ANIMATION */
-function startStripAnim(stripEl, slideIds, cols, step, delay=0, gap=0){
+/* STRIP ANIMATION — calm infinite loop, scrolls by small delta each tick */
+function startStripAnim(stripEl, displayCells, cols, step, delay=0, gap=0){
   const speed=config.slideshowSpeed||5000;
   const dur=transCfg.duration||1200;
-  const total=slideIds.length;
-  if(!total) return;
+  const totalCells=displayCells.length;
+  const perRound=totalCells/3;
+  if(!perRound) return;
 
-  let offset=0;
+  // Ruhiger Lauf: nie mehr als die sichtbare Breite auf einmal scrollen
+  const effectiveStep = Math.min(step, cols);
+
+  const cells=stripEl.querySelectorAll('.tv-strip-cell');
+
+  // Build SLOT-BASED position lookup table
+  const slotPositions=[];
+  let pos=0;
+  const g=(gap||0);
+  for(let i=0;i<perRound;i++){
+    const span=displayCells[i].span||1;
+    const w=cells[i]?cells[i].offsetWidth:0;
+    for(let s=0;s<span;s++){
+      slotPositions.push(pos+s*(w/span));
+    }
+    pos+=w+g;
+  }
+  const roundW=pos; // start-to-start distance between copies (INCLUDES trailing gap)
+  const totalSlots=slotPositions.length;
+
+  let slotIdx=0;
+  let absPos=0; // cumulative absolute pixel position (keeps growing forward)
+  let snapTimer=null;
+  const mod=(a,m)=>((a%m)+m)%m;
 
   const tick=()=>{
-    const rawNext=offset+step;
-    const nextOffset=rawNext%total;
-    const isWrapping=rawNext>=total;
+    if(snapTimer){ clearTimeout(snapTimer); snapTimer=null; }
 
-    const blockWidth=stripEl.parentElement?.clientWidth||stripEl.clientWidth;
-    const cellWidth=blockWidth/cols; // Eine Zelle = Viewport / cols (inkl. Padding/Balken)
-    const targetX=-rawNext*cellWidth;
+    const prevSlotIdx=slotIdx;
+    slotIdx=mod(slotIdx+effectiveStep, totalSlots);
 
-    stripEl.style.transition=`transform ${dur}ms ${transCfg.easing||'ease-in-out'}`;
-    stripEl.style.transform=`translateX(${targetX}px)`;
-
-    if(isWrapping){
-      setTimeout(()=>{
-        stripEl.style.transition='none';
-        stripEl.style.transform=`translateX(${-nextOffset*cellWidth}px)`;
-        requestAnimationFrame(()=>{ stripEl.style.transition=''; });
-      }, dur);
+    // Calculate calm forward delta (never a big roundW jump)
+    let delta;
+    if(slotIdx>=prevSlotIdx){
+      delta=slotPositions[slotIdx]-slotPositions[prevSlotIdx];
+    }else{
+      // Wrapped around end of timeline: to end + from start
+      delta=(roundW-slotPositions[prevSlotIdx])+slotPositions[slotIdx];
     }
 
-    offset=nextOffset;
+    absPos+=delta;
+
+    // Smoothly scroll forward by the small delta
+    stripEl.style.transition=`transform ${dur}ms ${transCfg.easing||'ease-in-out'}`;
+    stripEl.style.transform=`translateX(${-absPos}px)`;
+
+    // After transition: if we've entered the 3rd copy, snap back by roundW
+    snapTimer=setTimeout(()=>{
+      snapTimer=null;
+      if(absPos>=roundW*2){
+        absPos-=roundW;
+        stripEl.style.transition='none';
+        stripEl.style.transform=`translateX(${-absPos}px)`;
+        void stripEl.offsetWidth;
+        stripEl.style.transition='';
+      }
+    }, dur+10);
   };
 
+  stripEl.style.transform='translateX(0px)';
   const initial=setTimeout(()=>{
     tick();
     const interval=setInterval(tick, speed);
@@ -248,8 +310,6 @@ function startStripAnim(stripEl, slideIds, cols, step, delay=0, gap=0){
   }, delay);
   rowTimers.push(initial);
 }
-
-/* SLIDESHOW */
 function renderSlideshow() {
   const a=document.getElementById('slideA'), b=document.getElementById('slideB');
   if(!a||!b){ console.error('[TV] slideA/B nicht gefunden'); return; }
@@ -425,7 +485,6 @@ function applyTransition(img, newUrl, oldSrc, type, dur){
 }
 
 /* IMAGE URL RESOLVER (Server Backend v4.1) */
-const urlCache=new Map();
 async function loadSlideImage(slideId){
   if(!slideId) return null;
   const cached=urlCache.get(slideId);
@@ -468,6 +527,37 @@ function setupIdle(){
 function toggleDebug(){
   const ov=document.getElementById('debugOverlay');
   if(ov) ov.classList.toggle('visible');
+}
+
+/* POLLING */
+let pollTimer=null, lastKnownModified=0;
+function parseInterval(str){
+  str=(str||'2m').trim().toLowerCase();
+  const m=str.match(/^(\d+(?:\.\d+)?)\s*([smhd])?$/);
+  if(!m) return 120000;
+  const n=parseFloat(m[1]);
+  const u=m[2]||'m';
+  const ms={s:1000,m:60000,h:3600000,d:86400000}[u]||60000;
+  return Math.max(1000, Math.min(86400000, Math.round(n*ms)));
+}
+async function startPolling(){
+  if(pollTimer){ clearInterval(pollTimer); pollTimer=null; }
+  const cfg=await db.config.get('global')||DEFAULT_CONFIG;
+  const iv=parseInterval(cfg.refreshInterval);
+  lastKnownModified=cfg.lastModified||0;
+  console.log('[TV] Polling Intervall:',cfg.refreshInterval,'=',iv,'ms');
+  pollTimer=setInterval(async()=>{
+    try{
+      const r=await fetch(`/api/check-update?since=${lastKnownModified}`);
+      if(!r.ok){ console.warn('[TV] check-update HTTP',r.status); return; }
+      const j=await r.json();
+      if(j.changed){
+        lastKnownModified=j.lastModified||Date.now();
+        console.log('[TV] Daten geändert → reload');
+        window.location.reload();
+      }
+    }catch(e){ console.error('[TV] poll error:',e); }
+  }, iv);
 }
 
 window.refreshSlides=render;
