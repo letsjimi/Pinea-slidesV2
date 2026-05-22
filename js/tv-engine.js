@@ -254,7 +254,7 @@ function startStripAnim(stripEl, displayCells, cols, step, delay=0, gap=0){
   const g=(gap||0);
   for(let i=0;i<perRound;i++){
     const span=displayCells[i].span||1;
-    const w=cells[i]?cells[i].getBoundingClientRect().width:0;
+    const w=cells[i]?cells[i].offsetWidth:0;
     for(let s=0;s<span;s++){
       slotPositions.push(pos+s*(w/span));
     }
