@@ -75,10 +75,6 @@ function renderIPLinks() {
   updateTVPreviewRotation('right');
 }
 
-function getTVBase(side) {
-  return `http://${serverIP}:${side==='left'?8091:8092}`;
-}
-
 let ratioLocked = false;
 
 async function updateTVPreviewRotation(side) {
@@ -101,6 +97,10 @@ async function updateTVPreviewRotation(side) {
       }
     }
   } catch(e) { console.warn('Rotation fetch failed for', side, e); }
+}
+
+function getTVBase(side) {
+  return `http://${serverIP}:${side==='left'?8091:8092}`;
 }
 
 window.startSlideshow = function() {
