@@ -47,16 +47,12 @@ async function initApp(){
 
 function detectServer() {
   const h = window.location.hostname;
-  const isGitHub = h.includes('github.io');
-  if (isGitHub) {
+  if (h.includes('github.io')) {
     serverURL = 'https://letsjimi.github.io/Pinea-slidesV2';
     serverIP = 'GitHub Pages';
-  } else if (h.includes('timonlivesound.com') || h.includes('cloudflare')) {
-    serverURL = window.location.origin;
-    serverIP = h;
   } else {
     serverIP = h;
-    serverURL = `http://${h}:8090`;
+    serverURL = window.location.origin;
   }
   const b = document.getElementById('ipBadge');
   if (b) b.textContent = `📡 ${serverURL}`;
@@ -64,14 +60,8 @@ function detectServer() {
 
 function renderIPLinks() {
   const ids = ['linkAdminA','linkLeftA','linkRightA'];
-  let leftURL, rightURL;
-  if (serverURL.includes('timonlivesound.com')) {
-    leftURL = 'https://tvleft.timonlivesound.com';
-    rightURL = 'https://tvright.timonlivesound.com';
-  } else {
-    leftURL = `http://${serverIP}:8091`;
-    rightURL = `http://${serverIP}:8092`;
-  }
+  const leftURL = `http://${serverIP}:8091`;
+  const rightURL = `http://${serverIP}:8092`;
   const urls = [serverURL + '/', leftURL + '/', rightURL + '/'];
   ids.forEach((id,i) => {
     const el = document.getElementById(id);
@@ -83,6 +73,10 @@ function renderIPLinks() {
   if (pr) pr.src = urls[2];
   updateTVPreviewRotation('left');
   updateTVPreviewRotation('right');
+}
+
+function getTVBase(side) {
+  return `http://${serverIP}:${side==='left'?8091:8092}`;
 }
 
 let ratioLocked = false;
@@ -107,13 +101,6 @@ async function updateTVPreviewRotation(side) {
       }
     }
   } catch(e) { console.warn('Rotation fetch failed for', side, e); }
-}
-
-function getTVBase(side) {
-  if (serverURL.includes('timonlivesound.com')) {
-    return side==='left' ? 'https://tvleft.timonlivesound.com' : 'https://tvright.timonlivesound.com';
-  }
-  return `http://${serverIP}:${side==='left'?8091:8092}`;
 }
 
 window.startSlideshow = function() {
