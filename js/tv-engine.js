@@ -64,6 +64,7 @@ function applyConfig() {
 async function render() {
   clearTimers();
   removeMatrix();
+  deactivateSlideLayers();
   const totalSlides=(layout.timelines||[]).flat().filter(Boolean).length;
   if(totalSlides===0){
     showScreensaver(true);
@@ -83,6 +84,12 @@ function showScreensaver(show){
   if(ss) ss.classList.toggle('active', show);
   const label=document.getElementById('groupLabel');
   if(label && show) label.classList.remove('visible');
+}
+
+function deactivateSlideLayers(){
+  const a=document.getElementById('slideA'), b=document.getElementById('slideB');
+  if(a){ a.classList.remove('active'); a.style.opacity=''; a.style.transform=''; a.style.backgroundImage=''; }
+  if(b){ b.classList.remove('active'); b.style.opacity=''; b.style.transform=''; b.style.backgroundImage=''; }
 }
 
 /* MATRIX */
