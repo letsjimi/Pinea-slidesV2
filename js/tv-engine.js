@@ -228,7 +228,7 @@ function startCellAnim(rowIdx, slideIds, cols, step, delay=0){
   rowTimers.push(initial);
 }
 
-/* STRIP ANIMATION — pixel-perfect infinite loop via SLOT-BASED position lookup table */
+/* STRIP ANIMATION — calm infinite loop, scrolls by small delta each tick */
 function startStripAnim(stripEl, displayCells, cols, step, delay=0, gap=0){
   const speed=config.slideshowSpeed||5000;
   const dur=transCfg.duration||1200;
@@ -236,15 +236,12 @@ function startStripAnim(stripEl, displayCells, cols, step, delay=0, gap=0){
   const perRound=totalCells/3;
   if(!perRound) return;
 
-  // Ruhiger Lauf: scroll immer exakt um die sichtbare Breite (cols Slots),
-  // nie mehrere Seiten auf einmal. Das verhindert "Rasen" durch lange Timelines.
+  // Ruhiger Lauf: nie mehr als die sichtbare Breite auf einmal scrollen
   const effectiveStep = Math.min(step, cols);
 
   const cells=stripEl.querySelectorAll('.tv-strip-cell');
 
-  // Build SLOT-BASED position lookup table.
-  // Each span unit = 1 slot. A span=2 image occupies 2 consecutive slots,
-  // so effectiveStep scrolls exactly one visible page without skipping neighbours.
+  // Build SLOT-BASED position lookup table
   const slotPositions=[];
   let pos=0;
   const g=(gap||0);
@@ -256,26 +253,45 @@ function startStripAnim(stripEl, displayCells, cols, step, delay=0, gap=0){
     }
     pos+=w+g;
   }
-  const roundW=pos; // start-to-start distance between copies (includes trailing gap)
+  const roundW=pos-g; // start-to-start distance between copies
   const totalSlots=slotPositions.length;
 
   let slotIdx=0;
+  let absPos=0; // cumulative absolute pixel position (keeps growing forward)
   let snapTimer=null;
   const mod=(a,m)=>((a%m)+m)%m;
 
   const tick=()=>{
     if(snapTimer){ clearTimeout(snapTimer); snapTimer=null; }
+
+    const prevSlotIdx=slotIdx;
     slotIdx=mod(slotIdx+effectiveStep, totalSlots);
-    const snapPos=slotPositions[slotIdx];
-    const virtualPos=snapPos+roundW; // 2nd copy
+
+    // Calculate calm forward delta (never a big roundW jump)
+    let delta;
+    if(slotIdx>=prevSlotIdx){
+      delta=slotPositions[slotIdx]-slotPositions[prevSlotIdx];
+    }else{
+      // Wrapped around end of timeline: to end + from start
+      delta=(roundW-slotPositions[prevSlotIdx])+slotPositions[slotIdx];
+    }
+
+    absPos+=delta;
+
+    // Smoothly scroll forward by the small delta
     stripEl.style.transition=`transform ${dur}ms ${transCfg.easing||'ease-in-out'}`;
-    stripEl.style.transform=`translateX(${-virtualPos}px)`;
+    stripEl.style.transform=`translateX(${-absPos}px)`;
+
+    // After transition: if we've entered the 3rd copy, snap back by roundW
     snapTimer=setTimeout(()=>{
       snapTimer=null;
-      stripEl.style.transition='none';
-      stripEl.style.transform=`translateX(${-snapPos}px)`;
-      void stripEl.offsetWidth;
-      stripEl.style.transition='';
+      if(absPos>=roundW*2){
+        absPos-=roundW;
+        stripEl.style.transition='none';
+        stripEl.style.transform=`translateX(${-absPos}px)`;
+        void stripEl.offsetWidth;
+        stripEl.style.transition='';
+      }
     }, dur+10);
   };
 
